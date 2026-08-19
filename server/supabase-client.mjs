@@ -41,6 +41,22 @@ export function clientForToken(accessToken) {
 }
 
 /**
+ * Cliente anonimo nuevo y aislado, para operaciones de auth que necesitan
+ * arrastrar una sesion entre dos llamadas (verificar un codigo y despues
+ * cambiar la contrasena).
+ *
+ * No sirve reutilizar guestClient ni clientForToken para esto:
+ * - guestClient es compartido por todo el proceso, y dejar una sesion pegada
+ *   en el haria que dos peticiones simultaneas se pisaran.
+ * - clientForToken pone el token como cabecera HTTP, que basta para consultar
+ *   tablas, pero los metodos de auth leen la sesion guardada en la instancia
+ *   y no esa cabecera.
+ */
+export function isolatedAuthClient() {
+  return createClient(url, anonKey, options);
+}
+
+/**
  * Cliente administrativo. IGNORA RLS por completo.
  *
  * Reservado para lo que no puede hacerse de otra forma: crear cuentas y

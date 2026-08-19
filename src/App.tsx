@@ -223,7 +223,7 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [publishAfterAuth, setPublishAfterAuth] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [recoveryToken, setRecoveryToken] = useState("");
+  const [passwordFlowEmail, setPasswordFlowEmail] = useState("");
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [creatorGateOpen, setCreatorGateOpen] = useState(false);
@@ -300,9 +300,10 @@ export default function App() {
       if (!response.ok) throw new Error(data.error);
       setAccountOpen(false);
       setAuthOpen(false);
-      setFeedback(data.message || "Te enviamos un correo para confirmar el cambio.");
+      setPasswordFlowEmail(email || user?.email || "");
+      setFeedback(data.message || "Te enviamos un código a tu correo.");
     } catch (error) {
-      setFeedback(error instanceof Error && error.message ? error.message : "No se pudo enviar el correo de verificación.");
+      setFeedback(error instanceof Error && error.message ? error.message : "No se pudo enviar el código de verificación.");
     }
   };
 
@@ -320,11 +321,11 @@ export default function App() {
       const response = await fetch("/api/auth/password", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ recoveryToken, password }),
+        body: JSON.stringify({ email: passwordFlowEmail, code: String(formData.get("code") || "").trim(), password }),
       });
       const data = await response.json() as { message?: string; error?: string };
       if (!response.ok) { setPasswordError(data.error || "No se pudo cambiar la contraseña."); return; }
-      setRecoveryToken("");
+      setPasswordFlowEmail("");
       clearSession();
       setFeedback(data.message || "Contraseña actualizada.");
       setAuthOpen(true);
@@ -392,26 +393,6 @@ export default function App() {
   };
 
   useEffect(() => { void loadListings(); }, []);
-  // Supabase devuelve a la persona desde el correo con los datos en el
-  // fragmento de la URL (#access_token=...&type=recovery). Se lee una sola vez
-  // y se limpia enseguida para que el token no quede en la barra ni en el
-  // historial del navegador.
-  useEffect(() => {
-    const hash = window.location.hash.replace(/^#/, "");
-    if (!hash) return;
-    const params = new URLSearchParams(hash);
-    const clean = () => window.history.replaceState(null, "", window.location.pathname + window.location.search);
-
-    if (params.get("error_description")) {
-      setFeedback(params.get("error_description") || "El enlace del correo ya no es válido.");
-      clean();
-      return;
-    }
-    if (params.get("type") === "recovery" && params.get("access_token")) {
-      setRecoveryToken(params.get("access_token") || "");
-      clean();
-    }
-  }, []);
   useEffect(() => {
     if (!authToken) return;
     void loadAccountData(authToken).catch((error) => {
@@ -934,11 +915,11 @@ export default function App() {
 
       {selected && <Modal className="product-modal" onClose={() => setSelected(null)}><div className="modal-product-art"><img src={covers[selected.coverKey] || covers.orbit} alt="" /></div><div className="modal-product-copy"><span className={`product-badge badge-${categoryCopy[selected.category].tone}`}>{categoryCopy[selected.category].label}</span><h2>{selected.title}</h2><p>{selected.description}</p><div className="modal-rating"><Star /> 4.8 <small>128 reseñas verificadas</small></div><strong>{currency(selected.priceCents)}</strong><ul><li><Check /> Entrega o confirmación inmediata</li><li><Check /> Publicado por {selected.publisher}</li><li><Check /> Datos guardados localmente</li>{selected.hasExecutable && <li><Download /> {distributionKind(selected.downloadFilename)} · {fileSize(selected.downloadSize)}</li>}</ul><div className="modal-product-actions">{selected.hasExecutable && <button className="secondary-button" type="button" onClick={() => void downloadDistribution(selected)}><Download /> Descargar proyecto</button>}<button className="primary-button" type="button" onClick={() => { void addCart(selected); setSelected(null); }}><ShoppingCart /> Añadir al carrito</button></div></div></Modal>}
 
-      {recoveryToken && <Modal className="form-modal auth-modal" onClose={() => { setRecoveryToken(""); setPasswordError(""); }}><span className="modal-kicker"><ShieldCheck /> CORREO VERIFICADO</span><h2>Define tu nueva contraseña</h2><p>Confirmaste el cambio desde tu correo. Escribe la contraseña que usarás de ahora en adelante.</p><form onSubmit={submitNewPassword}><label><span>Nueva contraseña</span><div><LockKeyhole /><input name="password" type="password" autoComplete="new-password" minLength={6} required placeholder="Mínimo 6 caracteres" /></div></label><label><span>Repite la contraseña</span><div><LockKeyhole /><input name="repeat" type="password" autoComplete="new-password" minLength={6} required placeholder="Escríbela de nuevo" /></div></label>{passwordError && <div className="auth-error" role="alert"><X /> <span>{passwordError}</span></div>}<button className="primary-button" type="submit" disabled={passwordSubmitting}>{passwordSubmitting ? <><RefreshCw className="spin" /> Guardando...</> : <>Guardar contraseña <ArrowRight /></>}</button></form></Modal>}
+      {passwordFlowEmail && <Modal className="form-modal auth-modal" onClose={() => { setPasswordFlowEmail(""); setPasswordError(""); }}><span className="modal-kicker"><ShieldCheck /> VERIFICACIÓN POR CORREO</span><h2>Escribe el código que te enviamos</h2><p>Mandamos un código de verificación a <strong>{passwordFlowEmail}</strong>. Tu contraseña no cambia hasta que lo confirmes aquí.</p><form onSubmit={submitNewPassword}><label><span>Código del correo</span><div><ShieldCheck /><input name="code" inputMode="numeric" autoComplete="one-time-code" required placeholder="Ej. 483920" /></div></label><label><span>Nueva contraseña</span><div><LockKeyhole /><input name="password" type="password" autoComplete="new-password" minLength={6} required placeholder="Mínimo 6 caracteres" /></div></label><label><span>Repite la contraseña</span><div><LockKeyhole /><input name="repeat" type="password" autoComplete="new-password" minLength={6} required placeholder="Escríbela de nuevo" /></div></label>{passwordError && <div className="auth-error" role="alert"><X /> <span>{passwordError}</span></div>}<button className="primary-button" type="submit" disabled={passwordSubmitting}>{passwordSubmitting ? <><RefreshCw className="spin" /> Guardando...</> : <>Guardar contraseña <ArrowRight /></>}</button><button className="link-button" type="button" disabled={passwordSubmitting} onClick={() => void requestPasswordChange(passwordFlowEmail)}>No me llegó, enviar otro código</button></form></Modal>}
 
       {authOpen && <Modal className="form-modal auth-modal" onClose={closeAuth}><span className="modal-kicker"><LockKeyhole /> ACCESO LOCAL</span><h2>{authMode === "login" ? "Bienvenido a TAKANA" : "Crea tu cuenta"}</h2><p>{publishAfterAuth ? "Regístrate o inicia sesión para subir tu juego, software o proyecto." : "Tu perfil y tu sesión se guardan únicamente en este computador."}</p><div className="modal-tabs"><button className={authMode === "login" ? "active" : ""} type="button" disabled={authSubmitting} onClick={() => { setAuthMode("login"); setAuthError(""); }}>Ya tengo cuenta</button><button className={authMode === "register" ? "active" : ""} type="button" disabled={authSubmitting} onClick={() => { setAuthMode("register"); setAuthError(""); }}>Crear cuenta</button></div><form key={authMode} onSubmit={submitAuth}>{authMode === "register" && <label><span>Nombre</span><div><UserRound /><input name="name" autoComplete="name" required minLength={2} placeholder="Tu nombre" /></div></label>}<label><span>Correo</span><div><Mail /><input name="email" type="email" inputMode="email" autoComplete="email" required placeholder="tu@correo.com" /></div></label><label><span>Contraseña</span><div><LockKeyhole /><input name="password" type="password" autoComplete={authMode === "login" ? "current-password" : "new-password"} minLength={6} required placeholder="Mínimo 6 caracteres" /></div></label>{authError && <div className="auth-error" role="alert"><X /> <span>{authError}</span></div>}<button className="primary-button" type="submit" disabled={authSubmitting}>{authSubmitting ? <><RefreshCw className="spin" /> {authMode === "login" ? "Ingresando..." : "Creando cuenta..."}</> : <>{publishAfterAuth ? (authMode === "login" ? "Entrar y publicar" : "Crear cuenta y publicar") : (authMode === "login" ? "Entrar" : "Crear cuenta")}<ArrowRight /></>}</button>{authMode === "login" && <button className="link-button" type="button" disabled={authSubmitting} onClick={(event) => { const form = event.currentTarget.form; const field = form?.elements.namedItem("email") as HTMLInputElement | null; const email = String(field?.value || "").trim(); if (!email) { setAuthError("Escribe tu correo y te enviamos el enlace."); return; } void requestPasswordChange(email); }}>¿Olvidaste tu contraseña?</button>}</form></Modal>}
 
-      {accountOpen && user && <Modal className="form-modal account-modal" onClose={() => setAccountOpen(false)}><span className="modal-kicker"><CircleUserRound /> CUENTA LOCAL</span><div className="account-profile"><span>{user.name.slice(0, 1).toUpperCase()}</span><div><h2>{user.name}</h2><p>{user.email}</p><small>{user.role === "superadmin" ? "Superadministrador" : user.role === "admin" ? "Administrador" : "Usuario"}</small></div></div><div className="account-actions">{isAdmin && <button className="secondary-button" type="button" onClick={() => { setAccountOpen(false); navigate("administracion"); }}><UserCog /> Abrir panel</button>}<button className="secondary-button" type="button" onClick={() => void requestPasswordChange()}><LockKeyhole /> Cambiar contraseña</button><button className="primary-button" type="button" onClick={() => void logout()}><LogOut /> Cerrar sesión</button></div><p className="account-note">Para cambiarla te enviaremos un correo de verificación a {user.email}. La contraseña no cambia hasta que abras ese enlace.</p></Modal>}
+      {accountOpen && user && <Modal className="form-modal account-modal" onClose={() => setAccountOpen(false)}><span className="modal-kicker"><CircleUserRound /> CUENTA LOCAL</span><div className="account-profile"><span>{user.name.slice(0, 1).toUpperCase()}</span><div><h2>{user.name}</h2><p>{user.email}</p><small>{user.role === "superadmin" ? "Superadministrador" : user.role === "admin" ? "Administrador" : "Usuario"}</small></div></div><div className="account-actions">{isAdmin && <button className="secondary-button" type="button" onClick={() => { setAccountOpen(false); navigate("administracion"); }}><UserCog /> Abrir panel</button>}<button className="secondary-button" type="button" onClick={() => void requestPasswordChange()}><LockKeyhole /> Cambiar contraseña</button><button className="primary-button" type="button" onClick={() => void logout()}><LogOut /> Cerrar sesión</button></div><p className="account-note">Para cambiarla te enviaremos un código a {user.email}. La contraseña no cambia hasta que lo confirmes.</p></Modal>}
 
       {managedUserOpen && isSuperadmin && <Modal className="form-modal" onClose={() => setManagedUserOpen(false)}><span className="modal-kicker"><Crown /> GESTIÓN DE ACCESOS</span><h2>Crear cuenta administrada</h2><p>El superadministrador define el rol inicial de esta cuenta.</p><form onSubmit={submitManagedUser}><label><span>Nombre</span><input name="name" required minLength={2} placeholder="Nombre completo" /></label><label><span>Correo</span><input name="email" type="email" required placeholder="usuario@takana.local" /></label><label><span>Contraseña temporal</span><input name="password" type="password" required minLength={6} placeholder="Mínimo 6 caracteres" /></label><label><span>Rol</span><select name="role" defaultValue="usuario"><option value="usuario">Usuario</option><option value="admin">Administrador</option><option value="superadmin">Superadministrador</option></select></label><button className="primary-button" type="submit"><Plus /> Crear cuenta</button></form></Modal>}
 
