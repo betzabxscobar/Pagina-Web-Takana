@@ -8,9 +8,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "concurrently -k -n WEB,API -c cyan,magenta \"vite --configLoader runner --host 127.0.0.1 --port 3100\" \"node --watch server/index.mjs --port 3101\"",
+    "dev": "concurrently -k -n WEB,API -c cyan,magenta \"vite --configLoader runner --host 127.0.0.1 --port 3100\" \"node --env-file-if-exists=.env --watch server/index.mjs --port 3101\"",
     "build": "tsc -b && vite build --configLoader runner",
-    "start": "node server/index.mjs --port 3100",
+    "start": "node --env-file-if-exists=.env server/index.mjs --port 3100",
     "typecheck": "tsc -b --pretty false",
     "test:backend": "node --test server/backend.test.mjs",
     "test": "npm run test:backend && npm run typecheck && npm run build"
