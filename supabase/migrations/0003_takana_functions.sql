@@ -26,10 +26,13 @@ begin
     raise exception 'La publicacion seleccionada no esta disponible.';
   end if;
 
+  -- En ON CONFLICT DO UPDATE la fila existente se referencia por el nombre de
+  -- la tabla sin calificar con el esquema: "public.cart_items.quantity" es un
+  -- error de sintaxis.
   insert into public.cart_items (user_id, listing_id, quantity)
   values (auth.uid(), p_listing_id, 1)
   on conflict (user_id, listing_id) do update
-    set quantity = public.cart_items.quantity + 1,
+    set quantity = cart_items.quantity + 1,
         updated_at = now();
 end;
 $fn$;
@@ -60,14 +63,18 @@ $fn$;
 -- Equivale a checkoutTransaction() de database.mjs: crea la orden, copia las
 -- lineas con el precio del momento y vacia el carrito, todo o nada.
 -- ---------------------------------------------------------------------------
+-- Devuelve json y no "returns table" a proposito: con columnas de salida
+-- llamadas id/total_cents/status, plpgsql las confunde con las columnas de
+-- public.orders y falla con "column reference is ambiguous".
 create or replace function public.checkout_cart()
-returns table (id bigint, total_cents integer, status public.order_status)
+returns json
 language plpgsql security invoker set search_path = public
 as $fn$
 declare
   v_user  uuid := auth.uid();
   v_total integer;
   v_order bigint;
+  v_result json;
 begin
   if v_user is null then
     raise exception 'Inicia sesion para comprar.';
@@ -101,10 +108,12 @@ begin
 
   delete from public.cart_items where user_id = v_user;
 
-  return query
-    select o.id, o.total_cents, o.status
-      from public.orders o
-     where o.id = v_order;
+  select json_build_object('id', o.id, 'total_cents', o.total_cents, 'status', o.status)
+    into v_result
+    from public.orders o
+   where o.id = v_order;
+
+  return v_result;
 end;
 $fn$;
 
