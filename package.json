@@ -16,6 +16,7 @@
     "test": "npm run test:backend && npm run typecheck && npm run build"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
     "better-sqlite3": "^12.4.1",
     "express": "^5.1.0",
     "lucide-react": "^0.468.0",

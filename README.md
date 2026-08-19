@@ -11,8 +11,8 @@ Marketplace local de videojuegos, software y soporte técnico.
 
 - React + Vite + TypeScript
 - Node.js + Express
-- SQLite local con `better-sqlite3`
-- Sin nube y sin servicios externos
+- Supabase (Postgres) con Row Level Security
+- Los archivos de distribución siguen guardándose en disco local
 
 ## Backend local
 

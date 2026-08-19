@@ -46,7 +46,8 @@ import { PROJECT_IDENTITY } from "./projectIdentity";
 type Category = "juego" | "software" | "servicio";
 type Filter = "todos" | Category;
 type View = "inicio" | "catalogo" | "servicios" | "como-funciona" | "administracion";
-type UserRole = "superadmin" | "admin" | "usuario";
+// "invitado" es el visitante sin sesion: no existe fila en profiles.
+type UserRole = "superadmin" | "admin" | "usuario" | "invitado";
 type AdminTab = "resumen" | "usuarios" | "publicaciones" | "citas" | "pedidos";
 
 interface Listing {
@@ -66,7 +67,7 @@ interface Listing {
 }
 
 interface AuthUser {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role: UserRole;
@@ -76,6 +77,7 @@ interface AuthUser {
 interface AuthSession {
   user: AuthUser;
   token: string;
+  refreshToken: string;
   expiresAt: string;
 }
 
@@ -113,7 +115,7 @@ interface AdminUser extends AuthUser {
 
 interface AdminListing extends Listing {
   published: boolean;
-  ownerUserId: number | null;
+  ownerUserId: string | null;
 }
 
 interface AdminBooking {
@@ -279,6 +281,27 @@ export default function App() {
     setCart(cartData.items || []);
   };
 
+  /** Canjea el refresh token por un token de acceso nuevo. */
+  const refreshSession = async () => {
+    const refreshToken = session?.refreshToken;
+    if (!refreshToken) return;
+    try {
+      const response = await fetch("/api/auth/refresh", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+      const data = await response.json() as { user?: AuthUser; token?: string; refreshToken?: string; expiresAt?: string };
+      if (!response.ok || !data.user || !data.token || !data.expiresAt) throw new Error();
+      const renewed = { user: data.user, token: data.token, refreshToken: data.refreshToken || refreshToken, expiresAt: data.expiresAt };
+      setSession(renewed);
+      window.localStorage.setItem("takana-session", JSON.stringify(renewed));
+    } catch {
+      clearSession();
+      setFeedback("Tu sesión venció. Inicia sesión de nuevo.");
+    }
+  };
+
   const clearSession = () => {
     setSession(null);
     setCreatorGateOpen(false);
@@ -324,6 +347,15 @@ export default function App() {
       setFeedback(error instanceof Error ? error.message : "No se pudo recuperar la sesión local.");
     });
   }, [authToken]);
+  // El token de acceso de Supabase caduca en ~1 hora. Se renueva un minuto
+  // antes de que venza para que la sesión no se corte mientras se navega.
+  useEffect(() => {
+    if (!session?.refreshToken || !session.expiresAt) return;
+    const margin = 60_000;
+    const delay = Math.max(5_000, new Date(session.expiresAt).getTime() - Date.now() - margin);
+    const timer = window.setTimeout(() => { void refreshSession(); }, delay);
+    return () => window.clearTimeout(timer);
+  }, [session?.refreshToken, session?.expiresAt]);
   useEffect(() => {
     if (view === "administracion" && isAdmin) void loadAdminData();
   }, [view, authToken, isAdmin, isSuperadmin]);
@@ -440,12 +472,12 @@ export default function App() {
           password: String(formData.get("password") || ""),
         }),
       });
-      const data = await response.json() as { user?: AuthUser; token?: string; expiresAt?: string; error?: string };
+      const data = await response.json() as { user?: AuthUser; token?: string; refreshToken?: string; expiresAt?: string; error?: string };
       if (!response.ok || !data.user || !data.token || !data.expiresAt) {
         setAuthError(data.error || "No se pudo completar el acceso.");
         return;
       }
-      const nextSession = { user: data.user, token: data.token, expiresAt: data.expiresAt };
+      const nextSession = { user: data.user, token: data.token, refreshToken: data.refreshToken || "", expiresAt: data.expiresAt };
       setSession(nextSession);
       window.localStorage.setItem("takana-session", JSON.stringify(nextSession));
       window.localStorage.removeItem("takana-user");
