@@ -300,7 +300,7 @@ app.get("/api/listings/:listingId/download", requireAuth, async (request, respon
     response.set({
       "Cache-Control": "private, no-store",
       "Content-Type": "application/octet-stream",
-      "X-Content-Type-Options": "nosniff",
+      "X-Content-Type-Options": "nosniff", ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ
     });
     const distributionStream = createReadStream(distributionPath);
     distributionStream.on("error", () => {

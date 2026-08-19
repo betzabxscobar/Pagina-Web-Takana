@@ -834,7 +834,7 @@ export default function App() {
             })}
           </section>
         </>}
-
+        ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ
         {view === "catalogo" && <section className="page-banner catalog-banner">
           <div><span><Gamepad2 /> CATÁLOGO DIGITAL</span><h1>Explora, descubre y crea.</h1><p>Juegos, herramientas y servicios seleccionados para tu próximo proyecto.</p></div>
           <button className="secondary-button" type="button" onClick={openPublish}><Upload /> Publicar proyecto</button>
