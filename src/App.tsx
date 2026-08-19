@@ -16,6 +16,7 @@ import {
   Gamepad2,
   Headphones,
   Heart,
+  Instagram,
   Laptop,
   LockKeyhole,
   LogOut,
@@ -848,7 +849,18 @@ export default function App() {
 
       {creatorGateOpen && user && <Modal className="form-modal creator-gate-modal" onClose={() => setCreatorGateOpen(false)}><span className="modal-kicker"><ShieldCheck /> CUENTA OBLIGATORIA PARA PUBLICAR</span><h2>Confirma tu cuenta de creador</h2><p>Todo juego, software o proyecto debe quedar asociado a una cuenta registrada.</p><div className="creator-account-card"><span>{user.name.slice(0, 1).toUpperCase()}</span><div><small>Publicarás como</small><strong>{user.name}</strong><p>{user.email}</p></div><BadgeCheck /></div><div className="creator-gate-note"><LockKeyhole /><p><strong>Cuenta verificada</strong><span>Tu publicación quedará protegida y vinculada a este perfil.</span></p></div><button className="primary-button" type="button" onClick={() => { setCreatorGateOpen(false); setPublishOpen(true); setFeedback(`Cuenta confirmada: ${user.name}.`); }}>Continuar y subir proyecto <ArrowRight /></button></Modal>}
 
-      <footer><Brand onClick={() => navigate("inicio")} /><p>Juegos, software y soporte técnico en un solo lugar.<br />{PROJECT_IDENTITY.copyright}</p><nav><button type="button" onClick={() => chooseCategory("todos")}>Catálogo</button><button type="button" onClick={() => navigate("servicios")}>Servicios</button><button type="button" onClick={openPublish}>Publicar</button></nav><span><i /> Supabase conectado</span></footer>
+      <footer>
+        <Brand onClick={() => navigate("inicio")} />
+        <p>Juegos, software y soporte técnico en un solo lugar.<br />{PROJECT_IDENTITY.copyright}</p>
+        <nav className="footer-social" aria-label="Redes sociales de TAKANA">
+          {/* Reemplaza # por la URL de tu perfil de TikTok. */}
+          <a href="https://www.tiktok.com/@takanateam?is_from_webapp=1&sender_device=pc" aria-label="TikTok de TAKANA" title="TikTok">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.6 5.4a4.5 4.5 0 0 1-2.8-2.8h-3v12.2a2.7 2.7 0 1 1-1.9-2.6V9.1a5.8 5.8 0 1 0 5 5.7V8.6a7.5 7.5 0 0 0 4.4 1.4V7a4.5 4.5 0 0 1-1.7-1.6Z" /></svg>
+          </a>
+          {/* Reemplaza # por la URL de tu perfil de Instagram. */}
+          <a href="https://www.instagram.com/takanateam?igsh=Z3hrZmlqNXUyeDY4&igsi=Z3hrZmlqNXUyeDY4" aria-label="Instagram de TAKANA" title="Instagram"><Instagram /></a>
+        </nav>
+      </footer>
 
       {selected && <Modal className="product-modal" onClose={() => setSelected(null)}><div className="modal-product-art"><img src={covers[selected.coverKey] || covers.orbit} alt="" /></div><div className="modal-product-copy"><span className={`product-badge badge-${categoryCopy[selected.category].tone}`}>{categoryCopy[selected.category].label}</span><h2>{selected.title}</h2><p>{selected.description}</p><div className="modal-rating"><Star /> 4.8 <small>128 reseñas verificadas</small></div><strong>{currency(selected.priceCents)}</strong><ul><li><Check /> Entrega o confirmación inmediata</li><li><Check /> Publicado por {selected.publisher}</li><li><Check /> Datos guardados localmente</li>{selected.hasExecutable && <li><Download /> {distributionKind(selected.downloadFilename)} · {fileSize(selected.downloadSize)}</li>}</ul><div className="modal-product-actions">{selected.hasExecutable && <button className="secondary-button" type="button" onClick={() => void downloadDistribution(selected)}><Download /> Descargar proyecto</button>}<button className="primary-button" type="button" onClick={() => { void addCart(selected); setSelected(null); }}><ShoppingCart /> Añadir al carrito</button></div></div></Modal>}
 
