@@ -1,6 +1,7 @@
 {
   "name": "takana-neon-marketplace",
   "version": "1.0.0",
+  "author": "Takana",
   "private": true,
   "type": "module",
   "engines": {
