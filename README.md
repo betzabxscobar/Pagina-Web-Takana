@@ -14,32 +14,59 @@ Marketplace local de videojuegos, software y soporte técnico.
 - Supabase (Postgres) con Row Level Security
 - Los archivos de distribución siguen guardándose en disco local
 
-## Backend local
+## Backend
 
-La base `data/takana.sqlite` almacena:
+Los datos viven en Supabase (Postgres). El esquema está en `supabase/migrations/`:
 
-- usuarios y sesiones seguras de 30 días;
 - publicaciones de juegos, software y servicios;
 - favoritos y carrito por usuario;
 - pedidos confirmados y sus productos;
 - citas de mantenimiento y soporte técnico.
 
+Las cuentas las maneja Supabase Auth; `profiles` guarda el nombre, el rol y el estado.
+
 ### Roles y permisos
 
-- `superadmin`: administra usuarios, roles, publicaciones, citas y pedidos; puede crear, editar y desactivar.
-- `admin`: puede crear y editar publicaciones y estados, pero las rutas de eliminación y usuarios están bloqueadas.
-- `usuario`: cuenta normal para comprar, publicar, guardar favoritos y solicitar soporte.
+- `invitado`: visitante sin cuenta. Sólo ve publicaciones publicadas y puede agendar soporte.
+- `usuario`: comprar, publicar, guardar favoritos y solicitar soporte.
+- `admin`: crear y editar publicaciones, citas y pedidos. No puede eliminar ni gestionar cuentas.
+- `superadmin`: control total, incluida la gestión de usuarios y roles.
 
-Si todavía no existe un superadministrador, la primera cuenta registrada recibe ese rol. Las siguientes cuentas creadas desde el registro público reciben el rol `usuario`. El superadmin puede crear administradores desde su panel.
+**Registrarse siempre otorga el rol `usuario`.** El trigger `handle_new_user` lo fija así e ignora
+cualquier rol que venga en la petición, de modo que nadie puede darse privilegios al crear su cuenta.
+`admin` y `superadmin` sólo los concede un superadmin desde su panel, y un trigger impide que alguien
+se cambie a sí mismo el rol o el estado.
 
-Las contraseñas se protegen con `scrypt` y los tokens de sesión sólo se almacenan como hash. Las rutas privadas usan `Authorization: Bearer <token>`.
+Los permisos no dependen del backend: los aplica Row Level Security dentro de Postgres, así que rigen
+aunque la consulta llegue por otro camino. Las rutas privadas usan `Authorization: Bearer <token>`.
 
 Rutas principales: `/api/auth`, `/api/listings`, `/api/favorites`, `/api/cart`, `/api/orders` y `/api/bookings`.
+
+### Cambio de contraseña
+
+Desde el modal de cuenta, o con "¿Olvidaste tu contraseña?" en el de acceso. Se envía un código al
+correo y nada cambia hasta que la persona lo confirma.
+
+El correo lo manda un SMTP propio, configurado en `.env`, y no el de Supabase: aquel es sólo para
+pruebas y activarlo exige permisos de administrador en el dashboard. Es una conexión saliente, así
+que funciona desde un equipo local sin servidor público ni dominio.
+
+Para comprobar las credenciales antes de probar desde la página:
+
+```bash
+npm run test:smtp -- tu@correo.com
+```
 
 ## Desarrollo
 
 ```bash
 npm install
+```
+
+Copia `.env.example` a `.env` y rellena los valores. Los scripts lo cargan solos, no hace falta
+exportar variables a mano. Después:
+
+```bash
 npm run dev
 ```
 
