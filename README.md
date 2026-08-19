@@ -1,5 +1,10 @@
 # TAKANA
 
+## Autoría
+
+Desarrollado por Takana. Fecha de autoría: 19 de agosto de 2026.
+El código se distribuye bajo una licencia propietaria; consulta [LICENSE](LICENSE).
+
 Marketplace local de videojuegos, software y soporte técnico.
 
 ## Arquitectura

@@ -40,6 +40,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { PROJECT_IDENTITY } from "./projectIdentity";
 
 type Category = "juego" | "software" | "servicio";
 type Filter = "todos" | Category;
@@ -847,7 +848,7 @@ export default function App() {
 
       {creatorGateOpen && user && <Modal className="form-modal creator-gate-modal" onClose={() => setCreatorGateOpen(false)}><span className="modal-kicker"><ShieldCheck /> CUENTA OBLIGATORIA PARA PUBLICAR</span><h2>Confirma tu cuenta de creador</h2><p>Todo juego, software o proyecto debe quedar asociado a una cuenta registrada.</p><div className="creator-account-card"><span>{user.name.slice(0, 1).toUpperCase()}</span><div><small>Publicarás como</small><strong>{user.name}</strong><p>{user.email}</p></div><BadgeCheck /></div><div className="creator-gate-note"><LockKeyhole /><p><strong>Cuenta verificada</strong><span>Tu publicación quedará protegida y vinculada a este perfil.</span></p></div><button className="primary-button" type="button" onClick={() => { setCreatorGateOpen(false); setPublishOpen(true); setFeedback(`Cuenta confirmada: ${user.name}.`); }}>Continuar y subir proyecto <ArrowRight /></button></Modal>}
 
-      <footer><Brand onClick={() => navigate("inicio")} /><p>Juegos, software y soporte técnico en un solo lugar.</p><nav><button type="button" onClick={() => chooseCategory("todos")}>Catálogo</button><button type="button" onClick={() => navigate("servicios")}>Servicios</button><button type="button" onClick={openPublish}>Publicar</button></nav><span><i /> SQLite local conectado</span></footer>
+      <footer><Brand onClick={() => navigate("inicio")} /><p>Juegos, software y soporte técnico en un solo lugar.<br />{PROJECT_IDENTITY.copyright}</p><nav><button type="button" onClick={() => chooseCategory("todos")}>Catálogo</button><button type="button" onClick={() => navigate("servicios")}>Servicios</button><button type="button" onClick={openPublish}>Publicar</button></nav><span><i /> SQLite local conectado</span></footer>
 
       {selected && <Modal className="product-modal" onClose={() => setSelected(null)}><div className="modal-product-art"><img src={covers[selected.coverKey] || covers.orbit} alt="" /></div><div className="modal-product-copy"><span className={`product-badge badge-${categoryCopy[selected.category].tone}`}>{categoryCopy[selected.category].label}</span><h2>{selected.title}</h2><p>{selected.description}</p><div className="modal-rating"><Star /> 4.8 <small>128 reseñas verificadas</small></div><strong>{currency(selected.priceCents)}</strong><ul><li><Check /> Entrega o confirmación inmediata</li><li><Check /> Publicado por {selected.publisher}</li><li><Check /> Datos guardados localmente</li>{selected.hasExecutable && <li><Download /> {distributionKind(selected.downloadFilename)} · {fileSize(selected.downloadSize)}</li>}</ul><div className="modal-product-actions">{selected.hasExecutable && <button className="secondary-button" type="button" onClick={() => void downloadDistribution(selected)}><Download /> Descargar proyecto</button>}<button className="primary-button" type="button" onClick={() => { void addCart(selected); setSelected(null); }}><ShoppingCart /> Añadir al carrito</button></div></div></Modal>}
 
