@@ -38,8 +38,6 @@ Rutas principales: `/api/auth`, `/api/listings`, `/api/favorites`, `/api/cart`, 
 
 ## Desarrollo
 
-Copia `.env.example` como `.env` y completa las credenciales de tu proyecto Supabase. `SUPABASE_ANON_KEY` y `VITE_SUPABASE_ANON_KEY` usan la misma anon key; `SUPABASE_SERVICE_ROLE` se requiere para las operaciones administrativas.
-
 ```bash
 npm install
 npm run dev

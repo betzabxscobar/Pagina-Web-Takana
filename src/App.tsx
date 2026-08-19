@@ -46,13 +46,6 @@ import { PROJECT_IDENTITY } from "./projectIdentity";
 type Category = "juego" | "software" | "servicio";
 type Filter = "todos" | Category;
 type View = "inicio" | "catalogo" | "servicios" | "como-funciona" | "administracion";
-
-async function readJson<T>(response: Response): Promise<T | null> {
-  const body = await response.text();
-  if (!body) return null;
-  try { return JSON.parse(body) as T; } catch { return null; }
-}
-
 // "invitado" es el visitante sin sesion: no existe fila en profiles.
 type UserRole = "superadmin" | "admin" | "usuario" | "invitado";
 type AdminTab = "resumen" | "usuarios" | "publicaciones" | "citas" | "pedidos";
@@ -264,8 +257,8 @@ export default function App() {
     setLoading(true);
     try {
       const response = await fetch("/api/listings");
-      const data = await readJson<{ items?: Listing[]; error?: string }>(response);
-      if (!response.ok || !data) throw new Error(data?.error || "No se pudo conectar con el servidor de TAKANA.");
+      const data = await response.json() as { items?: Listing[]; error?: string };
+      if (!response.ok) throw new Error(data.error);
       setListings(data.items || []);
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "No se pudo cargar el catálogo local.");
