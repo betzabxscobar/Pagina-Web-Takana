@@ -906,12 +906,10 @@ export default function App() {
         <Brand onClick={() => navigate("inicio")} />
         <p>Juegos, software y soporte técnico en un solo lugar.<br />{PROJECT_IDENTITY.copyright}</p>
         <nav className="footer-social" aria-label="Redes sociales de TAKANA">
-          {/* Reemplaza # por la URL de tu perfil de TikTok. */}
-          <a href="https://www.tiktok.com/@takanateam?is_from_webapp=1&sender_device=pc" aria-label="TikTok de TAKANA" title="TikTok">
+          <a href="https://www.tiktok.com/@takanateam" target="_blank" rel="noopener noreferrer" aria-label="TikTok de TAKANA" title="TikTok">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.6 5.4a4.5 4.5 0 0 1-2.8-2.8h-3v12.2a2.7 2.7 0 1 1-1.9-2.6V9.1a5.8 5.8 0 1 0 5 5.7V8.6a7.5 7.5 0 0 0 4.4 1.4V7a4.5 4.5 0 0 1-1.7-1.6Z" /></svg>
           </a>
-          {/* Reemplaza # por la URL de tu perfil de Instagram. */}
-          <a href="https://www.instagram.com/takanateam?igsh=Z3hrZmlqNXUyeDY4&igsi=Z3hrZmlqNXUyeDY4" aria-label="Instagram de TAKANA" title="Instagram"><Instagram /></a>
+          <a href="https://www.instagram.com/takanateam?igsh=Z3hrZmlqNXUyeDY4&igsi=Z3hrZmlqNXUyeDY4" target="_blank" rel="noopener noreferrer" aria-label="Instagram de TAKANA" title="Instagram"><Instagram /></a>
         </nav>
       </footer>
 
