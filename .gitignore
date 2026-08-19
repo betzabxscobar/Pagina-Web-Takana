@@ -6,3 +6,8 @@ data/*.sqlite-shm
 data/*.sqlite-wal
 data/uploads/
 _legacy-next-backup-*/.next/
+
+# Credenciales de Supabase - nunca deben subirse
+.env
+.env.*
+!.env.example

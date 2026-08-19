@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import path from "node:path";
 import { distributionExtension, isSupportedDistributionFile } from "./distribution-formats.mjs";
+import { clientForToken, guestClient, resolveUser } from "./supabase-client.mjs";
 import {
   addCartItem,
   addFavorite,
@@ -12,7 +13,6 @@ import {
   createBooking,
   createListing,
   createManagedUser,
-  createSession,
   databaseStatus,
   deactivateManagedUser,
   deleteBooking,
@@ -28,17 +28,13 @@ import {
   getListings,
   getListingDownload,
   getOrders,
-  getUserByToken,
-  loginUser,
-  registerUser,
   removeCartItem,
   removeFavorite,
-  revokeSession,
   updateBookingStatus,
   updateListingByAdmin,
   updateManagedUser,
   updateOrderStatus,
-} from "./database.mjs";
+} from "./data.mjs";
 
 const app = express();
 const portIndex = process.argv.indexOf("--port");
@@ -85,14 +81,22 @@ function tokenFrom(request) {
   return authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
 }
 
-function optionalAuth(request, _response, next) {
+/**
+ * Adjunta a la peticion un cliente de Supabase con la identidad de quien llama.
+ *
+ * Sin token queda el cliente anonimo, que en Postgres es el rol `anon`: eso es
+ * un invitado. Con token, todas las consultas viajan con su JWT y las politicas
+ * RLS aplican su rol real. El backend nunca decide permisos por su cuenta.
+ */
+async function optionalAuth(request, _response, next) {
   const token = tokenFrom(request);
-  request.auth = { token, user: getUserByToken(token) };
+  const user = token ? await resolveUser(token) : null;
+  request.auth = { token, user, client: user ? clientForToken(token) : guestClient };
   next();
 }
 
-function requireAuth(request, response, next) {
-  optionalAuth(request, response, () => {
+async function requireAuth(request, response, next) {
+  await optionalAuth(request, response, () => {
     if (!request.auth.user) {
       response.status(401).json({ error: "Inicia sesión para continuar." });
       return;
@@ -101,6 +105,11 @@ function requireAuth(request, response, next) {
   });
 }
 
+/**
+ * Segunda barrera, no la unica: RLS ya impide en la base que un usuario sin
+ * privilegios lea o escriba lo que no le toca. Esto solo devuelve un 403 claro
+ * en vez de una lista vacia.
+ */
 function requireRole(...roles) {
   return (request, response, next) => requireAuth(request, response, () => {
     if (!roles.includes(request.auth.user.role)) {
@@ -112,9 +121,9 @@ function requireRole(...roles) {
 }
 
 function route(handler, status = 200) {
-  return (request, response) => {
+  return async (request, response) => {
     try {
-      const body = handler(request, response);
+      const body = await handler(request, response);
       if (!response.headersSent) response.status(status).json(body);
     } catch (error) {
       response.status(400).json({ error: error instanceof Error ? error.message : "No se pudo completar la operación." });
@@ -122,16 +131,100 @@ function route(handler, status = 200) {
   };
 }
 
-app.get("/api/health", (_request, response) => response.json(databaseStatus()));
+app.get("/api/health", route(() => databaseStatus(guestClient)));
 
-app.get("/api/listings", route((request) => ({
-  items: getListings({ category: request.query.category, search: request.query.search }),
+// ---------------------------------------------------------------------------
+// Autenticacion, delegada a Supabase Auth.
+// El registro nunca envia un rol: el trigger on_auth_user_created de Postgres
+// siempre crea el perfil como 'usuario'. Admin y superadmin solo se otorgan
+// desde el panel del superadmin.
+// ---------------------------------------------------------------------------
+app.post("/api/auth", route(async (request) => {
+  const action = request.body.action === "register" ? "register" : "login";
+  const email = String(request.body.email || "").trim().toLowerCase();
+  const password = String(request.body.password || "");
+
+  if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Escribe un correo válido.");
+  if (password.length < 6) throw new Error("La contraseña debe tener al menos 6 caracteres.");
+
+  if (action === "register") {
+    const name = String(request.body.name || "").trim();
+    if (name.length < 2) throw new Error("Escribe un nombre de al menos 2 caracteres.");
+
+    const { error } = await guestClient.auth.signUp({
+      email,
+      password,
+      options: { data: { display_name: name } },
+    });
+    if (error) throw new Error(error.message || "No se pudo crear la cuenta.");
+  }
+
+  const { data, error } = await guestClient.auth.signInWithPassword({ email, password });
+  if (error || !data.session) {
+    throw new Error(action === "register"
+      ? "Cuenta creada. Confirma tu correo para poder iniciar sesión."
+      : "Correo o contraseña incorrectos.");
+  }
+
+  const user = await resolveUser(data.session.access_token);
+  if (!user) throw new Error("Esta cuenta fue desactivada por el superadministrador.");
+
+  return {
+    user,
+    token: data.session.access_token,
+    refreshToken: data.session.refresh_token,
+    expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
+  };
+}));
+
+/**
+ * Renueva la sesion.
+ *
+ * El token de acceso de Supabase vive ~1 hora, muy por debajo de los 30 dias
+ * que duraba la sesion propia. El refresh_token es el que sostiene la sesion
+ * larga, asi que el frontend lo canjea cuando el acceso vence.
+ */
+app.post("/api/auth/refresh", route(async (request) => {
+  const refreshToken = String(request.body.refreshToken || "");
+  if (!refreshToken) throw new Error("Falta el token de renovación.");
+
+  const { data, error } = await guestClient.auth.refreshSession({ refresh_token: refreshToken });
+  if (error || !data.session) throw new Error("La sesión venció. Inicia sesión de nuevo.");
+
+  const user = await resolveUser(data.session.access_token);
+  if (!user) throw new Error("Esta cuenta fue desactivada por el superadministrador.");
+
+  return {
+    user,
+    token: data.session.access_token,
+    refreshToken: data.session.refresh_token,
+    expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
+  };
+}));
+
+app.get("/api/auth/me", requireAuth, route((request) => ({ user: request.auth.user })));
+
+app.delete("/api/auth/session", async (request, response) => {
+  const token = tokenFrom(request);
+  if (token) await clientForToken(token).auth.signOut();
+  response.status(204).end();
+});
+
+// ---------------------------------------------------------------------------
+// Catalogo. GET es publico: un invitado ve las publicaciones publicadas.
+// ---------------------------------------------------------------------------
+app.get("/api/listings", optionalAuth, route(async (request) => ({
+  items: await getListings(request.auth.client, {
+    category: request.query.category,
+    search: request.query.search,
+  }),
 })));
-app.post("/api/listings", requireAuth, receiveDistribution, (request, response) => {
+
+app.post("/api/listings", requireAuth, receiveDistribution, async (request, response) => {
   try {
     const category = String(request.body.category || "");
     if (category !== "servicio" && !request.file) throw new Error("Selecciona el ejecutable o paquete completo de tu proyecto.");
-    const listing = createListing({
+    const listing = await createListing(request.auth.client, {
       ...request.body,
       priceCents: Number(request.body.priceCents),
       executable: request.file ? {
@@ -148,9 +241,10 @@ app.post("/api/listings", requireAuth, receiveDistribution, (request, response) 
   }
 });
 
-app.get("/api/listings/:listingId/download", requireAuth, (request, response) => {
+// Los archivos siguen en disco local; solo la autorizacion se movio a Postgres.
+app.get("/api/listings/:listingId/download", requireAuth, async (request, response) => {
   try {
-    const download = getListingDownload(request.params.listingId, request.auth.user.id);
+    const download = await getListingDownload(request.auth.client, request.params.listingId);
     const storageKey = path.basename(download.storageKey);
     const distributionPath = path.join(uploadDirectory, storageKey);
     if (!existsSync(distributionPath)) throw new Error("El archivo del proyecto no está disponible en este equipo.");
@@ -171,57 +265,56 @@ app.get("/api/listings/:listingId/download", requireAuth, (request, response) =>
   }
 });
 
-app.post("/api/auth", route((request) => {
-  const action = request.body.action === "register" ? "register" : "login";
-  const user = action === "register" ? registerUser(request.body) : loginUser(request.body);
-  const session = createSession(user.id);
-  return { user, ...session };
-}));
-app.get("/api/auth/me", requireAuth, route((request) => ({ user: request.auth.user })));
-app.delete("/api/auth/session", (request, response) => {
-  revokeSession(tokenFrom(request));
-  response.status(204).end();
-});
+// ---------------------------------------------------------------------------
+// Cuenta del usuario
+// ---------------------------------------------------------------------------
+app.get("/api/favorites", requireAuth, route(async (request) => ({ ids: await getFavoriteIds(request.auth.client) })));
+app.post("/api/favorites/:listingId", requireAuth, route((request) =>
+  addFavorite(request.auth.client, request.auth.user.id, request.params.listingId), 201));
+app.delete("/api/favorites/:listingId", requireAuth, route((request) =>
+  removeFavorite(request.auth.client, request.params.listingId)));
 
-app.get("/api/favorites", requireAuth, route((request) => ({ ids: getFavoriteIds(request.auth.user.id) })));
-app.post("/api/favorites/:listingId", requireAuth, route((request) => addFavorite(request.auth.user.id, request.params.listingId), 201));
-app.delete("/api/favorites/:listingId", requireAuth, route((request) => removeFavorite(request.auth.user.id, request.params.listingId)));
+app.get("/api/cart", requireAuth, route((request) => getCart(request.auth.client)));
+app.post("/api/cart/items", requireAuth, route((request) => addCartItem(request.auth.client, request.body.listingId), 201));
+app.delete("/api/cart/items/:listingId", requireAuth, route((request) => removeCartItem(request.auth.client, request.params.listingId)));
 
-app.get("/api/cart", requireAuth, route((request) => getCart(request.auth.user.id)));
-app.post("/api/cart/items", requireAuth, route((request) => addCartItem(request.auth.user.id, request.body.listingId), 201));
-app.delete("/api/cart/items/:listingId", requireAuth, route((request) => removeCartItem(request.auth.user.id, request.params.listingId)));
+app.post("/api/orders/checkout", requireAuth, route((request) => checkoutCart(request.auth.client), 201));
+app.get("/api/orders", requireAuth, route(async (request) => ({ items: await getOrders(request.auth.client) })));
 
-app.post("/api/orders/checkout", requireAuth, route((request) => checkoutCart(request.auth.user.id), 201));
-app.get("/api/orders", requireAuth, route((request) => ({ items: getOrders(request.auth.user.id) })));
+// Un invitado puede agendar soporte sin cuenta.
+app.post("/api/bookings", optionalAuth, route((request) =>
+  createBooking(request.auth.client, request.body, request.auth.user?.id ?? null), 201));
+app.get("/api/bookings", requireAuth, route(async (request) => ({ items: await getBookings(request.auth.client) })));
 
-app.post("/api/bookings", optionalAuth, route((request) => createBooking(request.body, request.auth.user?.id), 201));
-app.get("/api/bookings", requireAuth, route((request) => ({ items: getBookings(request.auth.user.id) })));
+// ---------------------------------------------------------------------------
+// Panel administrativo
+// ---------------------------------------------------------------------------
+app.get("/api/admin/summary", requireRole("superadmin", "admin"), route((request) => getAdminSummary(request.auth.client)));
 
-app.get("/api/admin/summary", requireRole("superadmin", "admin"), route(() => getAdminSummary()));
-app.get("/api/admin/users", requireRole("superadmin"), route(() => ({ items: getAdminUsers() })));
+app.get("/api/admin/users", requireRole("superadmin"), route(async (request) => ({ items: await getAdminUsers(request.auth.client) })));
 app.post("/api/admin/users", requireRole("superadmin"), route((request) => createManagedUser(request.body), 201));
 app.put("/api/admin/users/:userId", requireRole("superadmin"), route((request) =>
-  updateManagedUser(request.params.userId, request.body, request.auth.user.id)));
+  updateManagedUser(request.auth.client, request.params.userId, request.body)));
 app.delete("/api/admin/users/:userId", requireRole("superadmin"), route((request) =>
-  deactivateManagedUser(request.params.userId, request.auth.user.id)));
+  deactivateManagedUser(request.auth.client, request.params.userId, request.auth.user.id)));
 
-app.get("/api/admin/listings", requireRole("superadmin", "admin"), route(() => ({ items: getAdminListings() })));
+app.get("/api/admin/listings", requireRole("superadmin", "admin"), route(async (request) => ({ items: await getAdminListings(request.auth.client) })));
 app.put("/api/admin/listings/:listingId", requireRole("superadmin", "admin"), route((request) =>
-  updateListingByAdmin(request.params.listingId, request.body, request.auth.user.role === "superadmin")));
+  updateListingByAdmin(request.auth.client, request.params.listingId, request.body, request.auth.user.role === "superadmin")));
 app.delete("/api/admin/listings/:listingId", requireRole("superadmin"), route((request) =>
-  archiveListing(request.params.listingId)));
+  archiveListing(request.auth.client, request.params.listingId)));
 
-app.get("/api/admin/bookings", requireRole("superadmin", "admin"), route(() => ({ items: getAdminBookings() })));
+app.get("/api/admin/bookings", requireRole("superadmin", "admin"), route(async (request) => ({ items: await getAdminBookings(request.auth.client) })));
 app.put("/api/admin/bookings/:bookingId", requireRole("superadmin", "admin"), route((request) =>
-  updateBookingStatus(request.params.bookingId, request.body.status)));
+  updateBookingStatus(request.auth.client, request.params.bookingId, request.body.status)));
 app.delete("/api/admin/bookings/:bookingId", requireRole("superadmin"), route((request) =>
-  deleteBooking(request.params.bookingId)));
+  deleteBooking(request.auth.client, request.params.bookingId)));
 
-app.get("/api/admin/orders", requireRole("superadmin", "admin"), route(() => ({ items: getAdminOrders() })));
+app.get("/api/admin/orders", requireRole("superadmin", "admin"), route(async (request) => ({ items: await getAdminOrders(request.auth.client) })));
 app.put("/api/admin/orders/:orderId", requireRole("superadmin", "admin"), route((request) =>
-  updateOrderStatus(request.params.orderId, request.body.status)));
+  updateOrderStatus(request.auth.client, request.params.orderId, request.body.status)));
 app.delete("/api/admin/orders/:orderId", requireRole("superadmin"), route((request) =>
-  deleteOrder(request.params.orderId)));
+  deleteOrder(request.auth.client, request.params.orderId)));
 
 app.use("/api", (_request, response) => response.status(404).json({ error: "Ruta de API no encontrada." }));
 
@@ -232,5 +325,5 @@ if ((port === 3100 || process.env.TAKANA_SERVE_APP === "1") && existsSync(distDi
 }
 
 app.listen(port, "127.0.0.1", () => {
-  console.log(`TAKANA local listo en http://127.0.0.1:${port}`);
+  console.log(`TAKANA listo en http://127.0.0.1:${port}`);
 });

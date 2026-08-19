@@ -45,7 +45,8 @@ import { PROJECT_IDENTITY } from "./projectIdentity";
 type Category = "juego" | "software" | "servicio";
 type Filter = "todos" | Category;
 type View = "inicio" | "catalogo" | "servicios" | "como-funciona" | "administracion";
-type UserRole = "superadmin" | "admin" | "usuario";
+// "invitado" es el visitante sin sesion: no existe fila en profiles.
+type UserRole = "superadmin" | "admin" | "usuario" | "invitado";
 type AdminTab = "resumen" | "usuarios" | "publicaciones" | "citas" | "pedidos";
 
 interface Listing {
@@ -65,7 +66,7 @@ interface Listing {
 }
 
 interface AuthUser {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role: UserRole;
@@ -75,6 +76,7 @@ interface AuthUser {
 interface AuthSession {
   user: AuthUser;
   token: string;
+  refreshToken: string;
   expiresAt: string;
 }
 
@@ -112,7 +114,7 @@ interface AdminUser extends AuthUser {
 
 interface AdminListing extends Listing {
   published: boolean;
-  ownerUserId: number | null;
+  ownerUserId: string | null;
 }
 
 interface AdminBooking {
@@ -278,6 +280,27 @@ export default function App() {
     setCart(cartData.items || []);
   };
 
+  /** Canjea el refresh token por un token de acceso nuevo. */
+  const refreshSession = async () => {
+    const refreshToken = session?.refreshToken;
+    if (!refreshToken) return;
+    try {
+      const response = await fetch("/api/auth/refresh", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+      const data = await response.json() as { user?: AuthUser; token?: string; refreshToken?: string; expiresAt?: string };
+      if (!response.ok || !data.user || !data.token || !data.expiresAt) throw new Error();
+      const renewed = { user: data.user, token: data.token, refreshToken: data.refreshToken || refreshToken, expiresAt: data.expiresAt };
+      setSession(renewed);
+      window.localStorage.setItem("takana-session", JSON.stringify(renewed));
+    } catch {
+      clearSession();
+      setFeedback("Tu sesión venció. Inicia sesión de nuevo.");
+    }
+  };
+
   const clearSession = () => {
     setSession(null);
     setCreatorGateOpen(false);
@@ -323,6 +346,15 @@ export default function App() {
       setFeedback(error instanceof Error ? error.message : "No se pudo recuperar la sesión local.");
     });
   }, [authToken]);
+  // El token de acceso de Supabase caduca en ~1 hora. Se renueva un minuto
+  // antes de que venza para que la sesión no se corte mientras se navega.
+  useEffect(() => {
+    if (!session?.refreshToken || !session.expiresAt) return;
+    const margin = 60_000;
+    const delay = Math.max(5_000, new Date(session.expiresAt).getTime() - Date.now() - margin);
+    const timer = window.setTimeout(() => { void refreshSession(); }, delay);
+    return () => window.clearTimeout(timer);
+  }, [session?.refreshToken, session?.expiresAt]);
   useEffect(() => {
     if (view === "administracion" && isAdmin) void loadAdminData();
   }, [view, authToken, isAdmin, isSuperadmin]);
@@ -439,12 +471,12 @@ export default function App() {
           password: String(formData.get("password") || ""),
         }),
       });
-      const data = await response.json() as { user?: AuthUser; token?: string; expiresAt?: string; error?: string };
+      const data = await response.json() as { user?: AuthUser; token?: string; refreshToken?: string; expiresAt?: string; error?: string };
       if (!response.ok || !data.user || !data.token || !data.expiresAt) {
         setAuthError(data.error || "No se pudo completar el acceso.");
         return;
       }
-      const nextSession = { user: data.user, token: data.token, expiresAt: data.expiresAt };
+      const nextSession = { user: data.user, token: data.token, refreshToken: data.refreshToken || "", expiresAt: data.expiresAt };
       setSession(nextSession);
       window.localStorage.setItem("takana-session", JSON.stringify(nextSession));
       window.localStorage.removeItem("takana-user");
@@ -816,7 +848,7 @@ export default function App() {
 
       {creatorGateOpen && user && <Modal className="form-modal creator-gate-modal" onClose={() => setCreatorGateOpen(false)}><span className="modal-kicker"><ShieldCheck /> CUENTA OBLIGATORIA PARA PUBLICAR</span><h2>Confirma tu cuenta de creador</h2><p>Todo juego, software o proyecto debe quedar asociado a una cuenta registrada.</p><div className="creator-account-card"><span>{user.name.slice(0, 1).toUpperCase()}</span><div><small>Publicarás como</small><strong>{user.name}</strong><p>{user.email}</p></div><BadgeCheck /></div><div className="creator-gate-note"><LockKeyhole /><p><strong>Cuenta verificada</strong><span>Tu publicación quedará protegida y vinculada a este perfil.</span></p></div><button className="primary-button" type="button" onClick={() => { setCreatorGateOpen(false); setPublishOpen(true); setFeedback(`Cuenta confirmada: ${user.name}.`); }}>Continuar y subir proyecto <ArrowRight /></button></Modal>}
 
-      <footer><Brand onClick={() => navigate("inicio")} /><p>Juegos, software y soporte técnico en un solo lugar.<br />{PROJECT_IDENTITY.copyright}</p><nav><button type="button" onClick={() => chooseCategory("todos")}>Catálogo</button><button type="button" onClick={() => navigate("servicios")}>Servicios</button><button type="button" onClick={openPublish}>Publicar</button></nav><span><i /> SQLite local conectado</span></footer>
+      <footer><Brand onClick={() => navigate("inicio")} /><p>Juegos, software y soporte técnico en un solo lugar.<br />{PROJECT_IDENTITY.copyright}</p><nav><button type="button" onClick={() => chooseCategory("todos")}>Catálogo</button><button type="button" onClick={() => navigate("servicios")}>Servicios</button><button type="button" onClick={openPublish}>Publicar</button></nav><span><i /> Supabase conectado</span></footer>
 
       {selected && <Modal className="product-modal" onClose={() => setSelected(null)}><div className="modal-product-art"><img src={covers[selected.coverKey] || covers.orbit} alt="" /></div><div className="modal-product-copy"><span className={`product-badge badge-${categoryCopy[selected.category].tone}`}>{categoryCopy[selected.category].label}</span><h2>{selected.title}</h2><p>{selected.description}</p><div className="modal-rating"><Star /> 4.8 <small>128 reseñas verificadas</small></div><strong>{currency(selected.priceCents)}</strong><ul><li><Check /> Entrega o confirmación inmediata</li><li><Check /> Publicado por {selected.publisher}</li><li><Check /> Datos guardados localmente</li>{selected.hasExecutable && <li><Download /> {distributionKind(selected.downloadFilename)} · {fileSize(selected.downloadSize)}</li>}</ul><div className="modal-product-actions">{selected.hasExecutable && <button className="secondary-button" type="button" onClick={() => void downloadDistribution(selected)}><Download /> Descargar proyecto</button>}<button className="primary-button" type="button" onClick={() => { void addCart(selected); setSelected(null); }}><ShoppingCart /> Añadir al carrito</button></div></div></Modal>}
 
