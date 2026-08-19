@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import path from "node:path";
 import { distributionExtension, isSupportedDistributionFile } from "./distribution-formats.mjs";
-import { clientForToken, guestClient, resolveUser } from "./supabase-client.mjs";
+import { mailerConfigured, sendPasswordCode } from "./mailer.mjs";
+import { adminClient, clientForToken, guestClient, isolatedAuthClient, resolveUser } from "./supabase-client.mjs";
 import {
   addCartItem,
   addFavorite,
@@ -39,10 +40,6 @@ import {
 const app = express();
 const portIndex = process.argv.indexOf("--port");
 const port = Number(portIndex >= 0 ? process.argv[portIndex + 1] : process.env.PORT || 3101);
-// A donde vuelve la persona al abrir el enlace del correo de verificacion.
-// Debe estar en la lista de Redirect URLs de Supabase (Authentication ->
-// URL Configuration) o el enlace no funciona.
-const appUrl = process.env.TAKANA_APP_URL || "http://127.0.0.1:3100";
 const uploadDirectory = path.resolve(process.env.TAKANA_UPLOADS_PATH || path.join(process.cwd(), "data", "uploads"));
 const maximumDistributionMegabytes = Math.max(1, Number(
   process.env.TAKANA_MAX_PROJECT_MB || process.env.TAKANA_MAX_EXECUTABLE_MB || 2048,
@@ -207,46 +204,89 @@ app.post("/api/auth/refresh", route(async (request) => {
 }));
 
 /**
- * Paso 1 del cambio de contrasena: pedir el correo de verificacion.
+ * Cambio de contrasena verificado por correo, en dos pasos.
  *
- * Supabase Auth no permite "confirmar por correo antes de aplicar" un cambio
- * hecho con la sesion abierta: updateUser({ password }) se aplica al instante.
- * Para exigir la verificacion se usa el flujo de recuperacion, que es el que
- * si manda un enlace: nada cambia hasta que la persona abre ese correo.
+ * No se usa resetPasswordForEmail() porque ese camino depende de dos ajustes
+ * del dashboard de Supabase que el equipo no puede tocar: la lista de Redirect
+ * URLs y el servidor de correo. En su lugar se genera el codigo con la Admin
+ * API (que si funciona con la service_role) y se envia con el SMTP propio.
  *
- * Sirve para los dos casos con el mismo codigo: quien tiene sesion y quiere
- * cambiarla, y quien la olvido y no puede entrar.
+ * Nada cambia hasta que la persona escribe el codigo que le llego al correo.
  */
+
+// Freno simple por correo, para que nadie use el formulario como maquina de
+// mandar mensajes a una casilla ajena.
+const codeRequests = new Map();
+const CODE_COOLDOWN_MS = 60_000;
+
 app.post("/api/auth/password-reset", optionalAuth, route(async (request) => {
-  // Con sesion abierta se usa el correo de la sesion, no el que mande el
-  // cliente: si no, cualquiera podria disparar correos a terceros.
+  // Con sesion abierta se usa el correo de la sesion y no el que mande el
+  // cliente: de lo contrario cualquiera podria disparar correos a terceros.
   const email = request.auth.user?.email
     ?? String(request.body.email || "").trim().toLowerCase();
 
   if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Escribe un correo válido.");
 
-  await guestClient.auth.resetPasswordForEmail(email, { redirectTo: appUrl });
+  // Respuesta deliberadamente identica exista o no la cuenta: decir cuales
+  // correos estan registrados permitiria enumerar a los usuarios.
+  const respuestaNeutra = {
+    sent: true,
+    message: `Si ${email} tiene una cuenta, le enviamos un código de verificación.`,
+  };
 
-  // Respuesta deliberadamente igual exista o no la cuenta: revelar cuales
-  // correos estan registrados permitiria enumerar usuarios.
-  return { sent: true, message: `Si ${email} tiene una cuenta, le llegará un correo para confirmar el cambio.` };
+  const last = codeRequests.get(email);
+  if (last && Date.now() - last < CODE_COOLDOWN_MS) return respuestaNeutra;
+  codeRequests.set(email, Date.now());
+
+  try {
+    const { data, error } = await adminClient().auth.admin.generateLink({ type: "recovery", email });
+    if (error || !data?.properties?.email_otp) return respuestaNeutra;
+
+    await sendPasswordCode(
+      email,
+      data.properties.email_otp,
+      data.user?.user_metadata?.display_name || "",
+    );
+  } catch (error) {
+    // Que el SMTP no este configurado si debe verse: es un fallo del servidor,
+    // no una pista sobre si la cuenta existe.
+    if (!mailerConfigured) throw error;
+    return respuestaNeutra;
+  }
+
+  return respuestaNeutra;
 }));
 
 /**
- * Paso 2: aplicar la contrasena nueva.
- * El token llega del enlace del correo, asi que llegar aqui ya prueba que la
- * persona controla esa casilla.
+ * Paso 2: canjear el codigo por una sesion y aplicar la contrasena nueva.
+ * Llegar aqui con un codigo valido prueba que la persona controla esa casilla.
  */
 app.post("/api/auth/password", route(async (request) => {
-  const recoveryToken = String(request.body.recoveryToken || "").trim();
+  const email = String(request.body.email || "").trim().toLowerCase();
+  const code = String(request.body.code || "").trim();
   const password = String(request.body.password || "");
 
-  if (!recoveryToken) throw new Error("El enlace de confirmación no es válido o ya venció.");
+  if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Escribe un correo válido.");
+  if (!code) throw new Error("Escribe el código que te llegó al correo.");
   if (password.length < 6) throw new Error("La contraseña debe tener al menos 6 caracteres.");
 
-  const { error } = await clientForToken(recoveryToken).auth.updateUser({ password });
-  if (error) throw new Error("El enlace de confirmación no es válido o ya venció. Solicita uno nuevo.");
+  // Las dos llamadas van sobre la MISMA instancia: verifyOtp deja la sesion
+  // cargada en ella y updateUser la necesita ahi. Y es una instancia propia de
+  // esta peticion, para que dos cambios simultaneos no se pisen.
+  const authClient = isolatedAuthClient();
 
+  const { data, error } = await authClient.auth.verifyOtp({ email, token: code, type: "recovery" });
+  if (error || !data.session) {
+    throw new Error("El código no es válido o ya venció. Solicita uno nuevo.");
+  }
+
+  const { error: updateError } = await authClient.auth.updateUser({ password });
+  if (updateError) {
+    console.error("[password] updateUser fallo:", updateError.message);
+    throw new Error("No se pudo guardar la contraseña nueva. Intenta otra vez.");
+  }
+
+  codeRequests.delete(email);
   return { changed: true, message: "Contraseña actualizada. Inicia sesión con la nueva." };
 }));
 
