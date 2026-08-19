@@ -63,12 +63,28 @@ npm run test:smtp -- tu@correo.com
 npm install
 ```
 
-Copia `.env.example` a `.env` y rellena los valores. Los scripts lo cargan solos, no hace falta
-exportar variables a mano. Después:
+### El archivo `.env`
+
+**No hay que configurarlo desde cero.** Las credenciales son del servidor, no de cada persona:
+alguien del equipo ya las obtuvo una vez y el mismo archivo sirve para todos.
+
+Pide el `.env` a quien montó el proyecto y déjalo en esta carpeta, junto a `package.json`. No hace
+falta crear cuentas de correo ni tocar Google: eso ya está hecho.
+
+Después comprueba que todo esté en orden:
+
+```bash
+npm run doctor
+```
+
+Te dice qué falta, si es que falta algo. Cuando salga «Todo listo»:
 
 ```bash
 npm run dev
 ```
+
+Sólo si vas a montar el proyecto por primera vez y no existe ningún `.env`, copia `.env.example`
+y sigue las indicaciones que trae dentro.
 
 La aplicación abre en `http://127.0.0.1:3100` y el API local se ejecuta en el puerto `3101`.
 

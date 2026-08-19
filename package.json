@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "concurrently -k -n WEB,API -c cyan,magenta \"vite --configLoader runner --host 127.0.0.1 --port 3100\" \"node --env-file-if-exists=.env --watch server/index.mjs --port 3101\"",
+    "doctor": "node --env-file-if-exists=.env scripts/doctor.mjs",
     "build": "tsc -b && vite build --configLoader runner",
     "start": "node --env-file-if-exists=.env server/index.mjs --port 3100",
     "typecheck": "tsc -b --pretty false",
