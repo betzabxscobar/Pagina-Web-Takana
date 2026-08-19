@@ -39,6 +39,10 @@ import {
 const app = express();
 const portIndex = process.argv.indexOf("--port");
 const port = Number(portIndex >= 0 ? process.argv[portIndex + 1] : process.env.PORT || 3101);
+// A donde vuelve la persona al abrir el enlace del correo de verificacion.
+// Debe estar en la lista de Redirect URLs de Supabase (Authentication ->
+// URL Configuration) o el enlace no funciona.
+const appUrl = process.env.TAKANA_APP_URL || "http://127.0.0.1:3100";
 const uploadDirectory = path.resolve(process.env.TAKANA_UPLOADS_PATH || path.join(process.cwd(), "data", "uploads"));
 const maximumDistributionMegabytes = Math.max(1, Number(
   process.env.TAKANA_MAX_PROJECT_MB || process.env.TAKANA_MAX_EXECUTABLE_MB || 2048,
@@ -200,6 +204,50 @@ app.post("/api/auth/refresh", route(async (request) => {
     refreshToken: data.session.refresh_token,
     expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
   };
+}));
+
+/**
+ * Paso 1 del cambio de contrasena: pedir el correo de verificacion.
+ *
+ * Supabase Auth no permite "confirmar por correo antes de aplicar" un cambio
+ * hecho con la sesion abierta: updateUser({ password }) se aplica al instante.
+ * Para exigir la verificacion se usa el flujo de recuperacion, que es el que
+ * si manda un enlace: nada cambia hasta que la persona abre ese correo.
+ *
+ * Sirve para los dos casos con el mismo codigo: quien tiene sesion y quiere
+ * cambiarla, y quien la olvido y no puede entrar.
+ */
+app.post("/api/auth/password-reset", optionalAuth, route(async (request) => {
+  // Con sesion abierta se usa el correo de la sesion, no el que mande el
+  // cliente: si no, cualquiera podria disparar correos a terceros.
+  const email = request.auth.user?.email
+    ?? String(request.body.email || "").trim().toLowerCase();
+
+  if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Escribe un correo válido.");
+
+  await guestClient.auth.resetPasswordForEmail(email, { redirectTo: appUrl });
+
+  // Respuesta deliberadamente igual exista o no la cuenta: revelar cuales
+  // correos estan registrados permitiria enumerar usuarios.
+  return { sent: true, message: `Si ${email} tiene una cuenta, le llegará un correo para confirmar el cambio.` };
+}));
+
+/**
+ * Paso 2: aplicar la contrasena nueva.
+ * El token llega del enlace del correo, asi que llegar aqui ya prueba que la
+ * persona controla esa casilla.
+ */
+app.post("/api/auth/password", route(async (request) => {
+  const recoveryToken = String(request.body.recoveryToken || "").trim();
+  const password = String(request.body.password || "");
+
+  if (!recoveryToken) throw new Error("El enlace de confirmación no es válido o ya venció.");
+  if (password.length < 6) throw new Error("La contraseña debe tener al menos 6 caracteres.");
+
+  const { error } = await clientForToken(recoveryToken).auth.updateUser({ password });
+  if (error) throw new Error("El enlace de confirmación no es válido o ya venció. Solicita uno nuevo.");
+
+  return { changed: true, message: "Contraseña actualizada. Inicia sesión con la nueva." };
 }));
 
 app.get("/api/auth/me", requireAuth, route((request) => ({ user: request.auth.user })));

@@ -106,3 +106,31 @@ footer{min-height:100px;display:grid;grid-template-columns:auto 1fr auto auto;al
 .app .admin-sidebar{border-color:#4d5890}
 .app :is(.admin-sidebar>nav button,.permission-note){outline-color:rgba(133,151,211,.55)}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* Enlace discreto dentro de un formulario (¿olvidaste tu contraseña?). */
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin-top: 12px;
+  color: inherit;
+  opacity: .72;
+  font: inherit;
+  font-size: .86rem;
+  text-decoration: underline;
+  cursor: pointer;
+  justify-self: center;
+}
+.link-button:hover { opacity: 1; }
+.link-button:disabled { opacity: .4; cursor: default; }
+
+/* Aviso bajo las acciones del modal de cuenta. */
+.account-note {
+  margin-top: 14px;
+  font-size: .82rem;
+  opacity: .68;
+  line-height: 1.45;
+}
+
+/* Con tres acciones (admin), la última ocupa la fila completa. */
+.account-actions>:last-child:nth-child(odd){grid-column:1/-1}
