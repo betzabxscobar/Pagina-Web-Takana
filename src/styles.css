@@ -137,26 +137,6 @@ footer{min-height:100px;display:grid;grid-template-columns:1fr auto 1fr;align-it
 .account-actions>:last-child:nth-child(odd){grid-column:1/-1}
 
 /* --- TAKABLOX ----------------------------------------------------------- */
-.takablox-card{
-  width:calc(100% - 80px);max-width:1180px;margin:0 auto 26px;
-  display:grid;grid-template-columns:1.25fr .75fr;gap:20px;align-items:center;
-  padding:30px 34px;border:1px solid var(--line-strong);border-radius:20px;
-  background:linear-gradient(115deg,#f4f0ff,#eaf7ff 55%,#fdf1ff);
-}
-.takablox-copy .eyebrow{display:inline-flex;align-items:center;gap:7px;color:#6d35dc;font-size:9px;font-weight:900;letter-spacing:.09em}
-.takablox-copy .eyebrow svg{width:14px}
-.takablox-copy h2{margin:10px 0 6px;font-size:34px;letter-spacing:-.02em}
-.takablox-copy p{margin:0 0 18px;max-width:46ch;color:#6b7290;font-size:11px;line-height:1.75}
-.takablox-copy .primary-button{width:auto;padding-inline:22px}
-
-/* Cuatro piezas que insinuan el tablero, sin cargar ninguna imagen. */
-.takablox-art{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;height:118px}
-.takablox-art span{border-radius:8px;background:#7b41f0;opacity:.9}
-.takablox-art span:nth-child(1){background:#30baf0;align-self:end;height:64%}
-.takablox-art span:nth-child(2){background:#7b41f0;height:100%}
-.takablox-art span:nth-child(3){background:#e23ee4;align-self:end;height:46%}
-.takablox-art span:nth-child(4){background:#19b9ee;align-self:end;height:82%}
-
 .takablox-page{width:calc(100% - 80px);max-width:1180px;margin:0 auto 34px;display:grid;gap:16px}
 .takablox-banner h1{letter-spacing:-.02em}
 .takablox-marco-caja{
@@ -166,19 +146,19 @@ footer{min-height:100px;display:grid;grid-template-columns:1fr auto 1fr;align-it
 .takablox-marco-caja iframe{width:100%;height:100%;display:block;border:0}
 
 @media(max-width:760px){
-  .takablox-card{width:calc(100% - 28px);grid-template-columns:1fr;padding:24px 20px}
-  .takablox-copy h2{font-size:28px}
-  .takablox-art{height:84px}
   .takablox-page{width:calc(100% - 28px)}
   /* En vertical el 16/9 deja el juego minusculo. */
   .takablox-marco-caja{aspect-ratio:3/4}
 }
 
-/* Botón de jugar en la tarjeta del catálogo, en lugar del carrito. */
-.play-chip{
-  height:32px;display:inline-flex;align-items:center;gap:6px;padding:0 12px;
-  border:0;border-radius:20px;cursor:pointer;
+/* Botón de jugar en la tarjeta, en lugar del carrito.
+   Va con el selector completo porque .product-footer>button fija 28x28 y,
+   con menos especificidad, el texto se desbordaba fuera del recuadro. */
+.product-footer>.play-chip{
+  width:auto;height:30px;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:0 13px;border:0;border-radius:20px;cursor:pointer;
   background:linear-gradient(90deg,#30baf0,#7b41f0);color:#fff;
-  font-size:9px;font-weight:800;letter-spacing:.04em;
+  font-size:9px;font-weight:800;letter-spacing:.04em;white-space:nowrap;
 }
-.play-chip svg{width:14px}
+.product-footer>.play-chip svg{width:14px;min-width:14px}

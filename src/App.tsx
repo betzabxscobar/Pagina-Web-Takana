@@ -146,7 +146,7 @@ const covers: Record<string, string> = {
   focus: "/assets/cover-focus-v2.png",
   orbit: "/assets/cover-orbit-v2.png",
   network: "/assets/cover-network-v2.png",
-  takablox: "/assets/cover-takablox.svg",
+  takablox: "/assets/cover-takablox.webp",
 };
 
 const categoryCopy = {
@@ -829,19 +829,6 @@ export default function App() {
             })}
           </section>
 
-          <section className="takablox-card" aria-label="TAKABLOX">
-            <div className="takablox-copy">
-              <span className="eyebrow"><Gamepad2 /> Juego propio de TAKANA</span>
-              <h2>TAKABLOX</h2>
-              <p>Nuestro Tetris, hecho por el equipo. Se juega aquí mismo, en el navegador, sin descargar ni instalar nada.</p>
-              <button className="primary-button" type="button" onClick={() => openGame(null)}>
-                Jugar ahora <ArrowRight />
-              </button>
-            </div>
-            <div className="takablox-art" aria-hidden="true">
-              <span /><span /><span /><span />
-            </div>
-          </section>
         </>}
 
         {view === "takablox" && <section className="takablox-page">
