@@ -1,13 +1,12 @@
 /**
- * Capa de datos sobre Supabase. Sustituye a server/database.mjs (SQLite).
+ * Capa de datos sobre Supabase.
  *
  * Cada funcion recibe el cliente ya ligado al usuario de la peticion, asi que
  * las politicas RLS son las que autorizan. Cuando una consulta no devuelve
  * filas por falta de permiso, RLS la filtra en silencio: por eso varias
  * funciones comprueban el resultado y lanzan un mensaje explicito.
  *
- * Las formas de retorno son identicas a las de la version SQLite para que el
- * frontend no tenga que cambiar.
+ * Las formas de retorno se mantienen tal como las espera el frontend.
  */
 import { adminClient, translateError } from "./supabase-client.mjs";
 

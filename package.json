@@ -13,13 +13,11 @@
     "build": "tsc -b && vite build --configLoader runner",
     "start": "node --env-file-if-exists=.env server/index.mjs",
     "typecheck": "tsc -b --pretty false",
-    "test:backend": "node --test server/backend.test.mjs",
-    "test": "npm run test:backend && npm run typecheck && npm run build",
+    "test": "npm run typecheck && npm run build",
     "test:smtp": "node --env-file-if-exists=.env scripts/test-smtp.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",
-    "better-sqlite3": "^12.4.1",
     "express": "^5.1.0",
     "lucide-react": "^0.468.0",
     "multer": "^2.2.0",

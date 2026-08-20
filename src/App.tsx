@@ -588,7 +588,7 @@ export default function App() {
       setPublishCategory("juego");
       setPublishOpen(false);
       await loadListings();
-      setFeedback(publishCategory === "servicio" ? "Servicio publicado en SQLite local." : "Proyecto y archivo descargable guardados localmente.");
+      setFeedback(publishCategory === "servicio" ? "Servicio publicado." : "Proyecto publicado. El archivo descargable queda en este equipo.");
       chooseCategory("todos");
     } catch {
       setFeedback("No se pudo conectar con el servidor local para subir el archivo del proyecto.");
@@ -651,7 +651,7 @@ export default function App() {
     if (!response.ok || !data.id) { setFeedback(data.error || "No se pudo confirmar la compra."); return; }
     setCart([]);
     setCartOpen(false);
-    setFeedback(`Pedido #${data.id} confirmado y guardado en SQLite.`);
+    setFeedback(`Pedido #${data.id} confirmado.`);
   };
 
   const adminMutation = async (url: string, method: "POST" | "PUT" | "DELETE", body?: unknown) => {
@@ -872,7 +872,7 @@ export default function App() {
           </aside>
 
           <div className="admin-content">
-            <header className="admin-heading"><div><span><Zap /> CENTRO DE CONTROL LOCAL</span><h1>{adminTab === "resumen" ? "Resumen general" : adminTab.charAt(0).toUpperCase() + adminTab.slice(1)}</h1><p>Gestiona TAKANA desde SQLite, sin servicios externos.</p></div><div>{isSuperadmin && adminTab === "usuarios" && <button className="primary-button" type="button" onClick={() => setManagedUserOpen(true)}><Plus /> Crear cuenta</button>}{adminTab === "publicaciones" && <button className="primary-button" type="button" onClick={openPublish}><Plus /> Nueva publicación</button>}<button className="admin-refresh" type="button" onClick={() => void loadAdminData()} aria-label="Actualizar panel"><RefreshCw /></button></div></header>
+            <header className="admin-heading"><div><span><Zap /> CENTRO DE CONTROL LOCAL</span><h1>{adminTab === "resumen" ? "Resumen general" : adminTab.charAt(0).toUpperCase() + adminTab.slice(1)}</h1><p>Gestiona TAKANA desde Supabase, con permisos aplicados en la base.</p></div><div>{isSuperadmin && adminTab === "usuarios" && <button className="primary-button" type="button" onClick={() => setManagedUserOpen(true)}><Plus /> Crear cuenta</button>}{adminTab === "publicaciones" && <button className="primary-button" type="button" onClick={openPublish}><Plus /> Nueva publicación</button>}<button className="admin-refresh" type="button" onClick={() => void loadAdminData()} aria-label="Actualizar panel"><RefreshCw /></button></div></header>
 
             {adminLoading ? <div className="admin-loading"><RefreshCw /> Actualizando panel...</div> : <>
               {adminTab === "resumen" && <>
@@ -884,7 +884,7 @@ export default function App() {
                 </div>
                 <div className="admin-overview-grid">
                   <article><div className="overview-title"><ShieldCheck /><div><strong>Matriz de permisos activa</strong><small>Validada tanto en la interfaz como en la API</small></div></div><div className="permission-row"><b>Superadmin</b><span>Usuarios · Roles · Crear · Editar · Desactivar</span><i>Control total</i></div><div className="permission-row"><b>Admin</b><span>Publicaciones · Citas · Pedidos</span><i>Crear y editar</i></div><div className="permission-row"><b>Usuario</b><span>Cuenta · Compras · Favoritos · Publicaciones propias</span><i>Uso normal</i></div></article>
-                  <article className="admin-status-card"><Database /><span><small>Motor de datos</small><strong>SQLite local</strong></span><BadgeCheck /><p>Los permisos se comprueban en cada solicitud. Ocultar un botón no sustituye la seguridad del servidor.</p></article>
+                  <article className="admin-status-card"><Database /><span><small>Motor de datos</small><strong>Supabase</strong></span><BadgeCheck /><p>Los permisos se comprueban en cada solicitud. Ocultar un botón no sustituye la seguridad del servidor.</p></article>
                 </div>
               </>}
 
