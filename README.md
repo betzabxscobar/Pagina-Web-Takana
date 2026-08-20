@@ -124,4 +124,22 @@ están en Supabase, pero el archivo descargable no. Resolverlo requiere moverlos
 npm test
 ```
 
+Ejecuta las pruebas de integración, el typecheck y la compilación.
+
+Las pruebas comprueban contra Supabase lo que de verdad protege TAKANA: que un invitado sólo vea lo
+publicado, que registrarse nunca otorgue privilegios, que un admin no pueda ascenderse a superadmin
+y que el código de verificación funcione una sola vez. Todo eso vive en las políticas RLS y en los
+triggers de Postgres, no en JavaScript, así que sólo puede verificarse contra la base real.
+
+**No tocan los datos del equipo.** Cada prueba crea sus propias cuentas con el prefijo `zz-test-` y
+las borra al terminar; la función de borrado se niega a eliminar nada que no lleve ese prefijo. La
+última prueba compara el número de perfiles, roles y publicaciones contra el estado inicial y falla
+si algo cambió.
+
+Sin credenciales en el `.env` las pruebas se saltan con un aviso, en vez de dar un falso verde.
+
+```bash
+npm test
+```
+
 La prueba del backend usa una base temporal aislada y no modifica los datos reales de TAKANA.
