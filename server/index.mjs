@@ -406,12 +406,20 @@ app.delete("/api/admin/orders/:orderId", requireRole("superadmin"), route((reque
 
 app.use("/api", (_request, response) => response.status(404).json({ error: "Ruta de API no encontrada." }));
 
+// En desarrollo el frontend lo sirve Vite en el 3100 y este proceso solo
+// atiende el API. Desplegado no hay Vite, asi que el mismo servidor entrega la
+// pagina compilada. TAKANA_SERVE_APP=1 fuerza ese modo con cualquier puerto.
 const distDirectory = path.join(process.cwd(), "dist");
-if ((port === 3100 || process.env.TAKANA_SERVE_APP === "1") && existsSync(distDirectory)) {
+const serveApp = port === 3100 || process.env.TAKANA_SERVE_APP === "1" || Boolean(process.env.TAKANA_HOST);
+if (serveApp && existsSync(distDirectory)) {
   app.use(express.static(distDirectory));
   app.get("/{*path}", (_request, response) => response.sendFile(path.join(distDirectory, "index.html")));
 }
 
-app.listen(port, "127.0.0.1", () => {
-  console.log(`TAKANA listo en http://127.0.0.1:${port}`);
+// Por defecto escucha solo en 127.0.0.1, de modo que en un equipo local no
+// queda expuesto a la red. Al desplegar hay que poner TAKANA_HOST=0.0.0.0 para
+// que el proveedor pueda alcanzar el proceso.
+const host = process.env.TAKANA_HOST || "127.0.0.1";
+app.listen(port, host, () => {
+  console.log(`TAKANA listo en http://${host}:${port}`);
 });

@@ -97,6 +97,27 @@ npm start
 
 El servidor sirve la aplicación compilada y el API desde `http://127.0.0.1:3100`.
 
+## Despliegue
+
+Mientras cada persona ejecuta el proyecto en su computador, todas necesitan el `.env` y las
+credenciales quedan repartidas en muchas máquinas. Desplegando una sola instancia eso desaparece:
+el equipo entra por un enlace y no instala nada.
+
+Con [render.yaml](render.yaml) el proceso es:
+
+1. En render.com: **New → Blueprint** y elegir este repositorio.
+2. En **Environment**, pegar los valores de `SUPABASE_*` y `SMTP_*`. Es la única vez que se hace,
+   y sólo lo hace quien despliega.
+3. Render entrega una URL con HTTPS. Eso es todo lo que reciben los demás.
+
+`TAKANA_HOST=0.0.0.0` ya viene en el blueprint: sin esa variable el servidor escucha únicamente en
+`127.0.0.1` y el proveedor no puede alcanzarlo. En local se deja sin definir, para no exponer el
+equipo a la red.
+
+**Limitación pendiente:** los archivos de distribución se guardan en el disco del servidor, que en
+los planes gratuitos es efímero y se borra en cada despliegue. Las publicaciones sobreviven, porque
+están en Supabase, pero el archivo descargable no. Resolverlo requiere moverlos a Supabase Storage.
+
 ## Pruebas
 
 ```bash

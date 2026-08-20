@@ -1,0 +1,37 @@
+# Despliegue en Render (render.com). Con este archivo en el repositorio basta
+# con New -> Blueprint y elegir el repo: toma todo de aqui.
+#
+# Las credenciales NO van en este archivo: se marcan como sync:false y se
+# escriben una sola vez en el panel de Render. Asi no quedan en el repositorio
+# ni hay que repartir ningun .env al equipo.
+services:
+  - type: web
+    name: takana
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      # Sin esto el proceso escucha solo en 127.0.0.1 y Render no lo alcanza.
+      - key: TAKANA_HOST
+        value: 0.0.0.0
+      - key: NODE_VERSION
+        value: "22"
+      # Se rellenan en el panel: Environment -> Add Environment Variable.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
