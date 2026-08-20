@@ -17,19 +17,16 @@
   reemplazan Build/, TemplateData/ e index.html.
 -->
 <style>
-  /* El juego se diseño para 960x600. Estirarlo a otra proporcion le recorta
-     los bordes: en 16:9 se perdian los botones de los extremos del menu.
-     Por eso el lienzo conserva 8/5 y se centra, ocupando lo maximo posible
-     sin deformarse. Vale igual dentro del marco que en pantalla completa. */
-  html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#0b0820; }
-  body { display:grid; place-items:center; }
-  #lienzo {
-    display:block;
-    aspect-ratio:8/5;
-    width:min(100%, calc(100vh * 8 / 5));
-    max-height:100%;
-    background:#0b0820;
-  }
+  /* TAKABLOX no se adapta al tamano de la ventana: su interfaz esta compuesta
+     para 960x600 y a otras resoluciones pierde los bordes, dejando fuera los
+     botones de los extremos del menu.
+
+     Por eso este documento se dimensiona siempre a 960x600 desde fuera, y es
+     TAKANA quien agranda el marco entero con un transform, igual que se
+     escala un video. El juego recibe asi la misma resolucion que en la
+     plantilla original de Unity y no puede recortarse. */
+  html, body { margin:0; padding:0; width:960px; height:600px; overflow:hidden; background:#0b0820; }
+  #lienzo { display:block; width:960px; height:600px; background:#0b0820; }
 
   /* Carga: se reemplaza la barra de Unity por una con los colores del sitio. */
   #carga {
@@ -62,9 +59,6 @@
 
 <script>
   var lienzo = document.querySelector("#lienzo");
-  var carga = document.querySelector("#carga");
-  var barra = document.querySelector("#barra > i");
-  var aviso = document.querySelector("#aviso");
 
   function mostrarAviso(mensaje, tipo) {
     if (tipo !== "error") return; // Los avisos pasajeros de Unity no aportan nada aquí.
@@ -91,6 +85,18 @@
       barra.style.width = (avance * 100) + "%";
     }).then(function (instancia) {
       carga.style.display = "none";
+
+      // Al arrancar, Unity fija el lienzo en 1024x576 (16:9), la resolucion por
+      // defecto de sus Player Settings. TAKABLOX esta compuesto para 960x600, y
+      // a 16:9 recorta los lados: en el menu desaparecen los botones de los
+      // extremos. Se corrige aqui, ya con el juego en marcha; comprobado que
+      // Unity no vuelve a cambiarla despues, ni siquiera al redimensionar.
+      // Unity fija el lienzo en 1024x576 (16:9) al arrancar, la resolucion por
+      // defecto de sus Player Settings. TAKABLOX esta compuesto para 960x600 y
+      // a 16:9 pierde los bordes. La ventana de este documento mide 960x600
+      // exactos, asi que basta con devolverlo a esa medida.
+      lienzo.width = 960;
+      lienzo.height = 600;
       // La página de TAKANA llama a esto desde su botón, para que el juego
       // entre en pantalla completa igual que con el botón propio de Unity:
       // así el lienzo se redimensiona en vez de quedar pequeño y rodeado

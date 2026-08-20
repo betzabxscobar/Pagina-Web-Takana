@@ -41,7 +41,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { PROJECT_IDENTITY } from "./projectIdentity";
 
 type Category = "juego" | "software" | "servicio";
@@ -233,6 +233,10 @@ export default function App() {
   const [passwordFlowEmail, setPasswordFlowEmail] = useState("");
   // Publicación abierta en la vista de juego. null = TAKABLOX por defecto.
   const [playing, setPlaying] = useState<Listing | null>(null);
+  // El juego se dibuja a 960x600 y se agranda con transform: así recibe la
+  // resolución para la que fue compuesto y nunca pierde los bordes.
+  const cajaJuego = useRef<HTMLDivElement | null>(null);
+  const [escalaJuego, setEscalaJuego] = useState(1);
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [creatorGateOpen, setCreatorGateOpen] = useState(false);
@@ -400,6 +404,22 @@ export default function App() {
       setAdminLoading(false);
     }
   };
+
+  useEffect(() => {
+    const caja = cajaJuego.current;
+    if (view !== "takablox" || !caja) return;
+    // clientWidth incluye el padding de 2px que dibuja el borde degradado; si
+    // no se descuenta, el juego se pasa unos pixeles y se recorta contra el.
+    const BORDE = 2;
+    const medir = () => setEscalaJuego(Math.min(
+      (caja.clientWidth - BORDE * 2) / 960,
+      (caja.clientHeight - BORDE * 2) / 600,
+    ) || 1);
+    medir();
+    const observador = new ResizeObserver(medir);
+    observador.observe(caja);
+    return () => observador.disconnect();
+  }, [view]);
 
   useEffect(() => { void loadListings(); }, []);
   useEffect(() => {
@@ -846,12 +866,13 @@ export default function App() {
               else void marco?.requestFullscreen?.();
             }}><Maximize2 /> Pantalla completa</button>
           </div>
-          <div className="takablox-marco-caja">
+          <div className="takablox-marco-caja" ref={cajaJuego}>
             <iframe
               id="takablox-marco"
               src={playing?.playUrl ?? "/takablox/takana.html"}
               title={playing?.title ?? "TAKABLOX"}
               allow="autoplay; fullscreen; gamepad"
+              style={{ transform: `scale(${escalaJuego})` }}
             />
           </div>
         </section>}
