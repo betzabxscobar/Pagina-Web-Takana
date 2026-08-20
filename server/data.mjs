@@ -14,7 +14,7 @@ const LISTING_FIELDS = `id, slug, title, description, category, publisher,
   priceCents:price_cents, coverKey:cover_key, featured,
   downloadFilename:download_filename, downloadSize:download_size,
   downloadStorageKey:download_storage_key, ownerUserId:owner_user_id,
-  createdAt:created_at`;
+  playUrl:play_url, createdAt:created_at`;
 
 const CATEGORIES = ["juego", "software", "servicio"];
 

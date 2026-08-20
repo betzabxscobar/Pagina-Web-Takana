@@ -63,6 +63,8 @@ interface Listing {
   hasExecutable: boolean;
   downloadFilename?: string | null;
   downloadSize?: number | null;
+  // Sólo las publicaciones que se juegan en el navegador la traen.
+  playUrl?: string | null;
   createdAt: string;
 }
 
@@ -144,6 +146,7 @@ const covers: Record<string, string> = {
   focus: "/assets/cover-focus-v2.png",
   orbit: "/assets/cover-orbit-v2.png",
   network: "/assets/cover-network-v2.png",
+  takablox: "/assets/cover-takablox.svg",
 };
 
 const categoryCopy = {
@@ -169,12 +172,13 @@ function Brand({ onClick }: { onClick: () => void }) {
   return <button className="brand" type="button" onClick={onClick} aria-label="Ir al inicio de TAKANA"><span className="brand-mascot"><img src="/assets/takana-mascot.png" alt="" /></span><strong>TAKANA</strong></button>;
 }
 
-function ProductCard({ item, favorite, onFavorite, onOpen, onCart }: {
+function ProductCard({ item, favorite, onFavorite, onOpen, onCart, onPlay }: {
   item: Listing;
   favorite: boolean;
   onFavorite: () => void;
   onOpen: () => void;
   onCart: () => void;
+  onPlay: () => void;
 }) {
   const meta = categoryCopy[item.category];
   return (
@@ -189,8 +193,10 @@ function ProductCard({ item, favorite, onFavorite, onOpen, onCart }: {
         <p>{meta.label} <i /> {item.publisher}</p>
         <div className="product-footer">
           <span className="rating"><Star /> 4.8 <small>(1.2k)</small></span>
-          <strong>{currency(item.priceCents)}</strong>
-          <button type="button" onClick={onCart} aria-label="Añadir al carrito"><ShoppingCart /></button>
+          <strong>{item.priceCents === 0 ? "Gratis" : currency(item.priceCents)}</strong>
+          {item.playUrl
+            ? <button className="play-chip" type="button" onClick={onPlay} aria-label={`Jugar ${item.title}`}><Gamepad2 /> Jugar</button>
+            : <button type="button" onClick={onCart} aria-label="Añadir al carrito"><ShoppingCart /></button>}
         </div>
       </div>
     </article>
@@ -224,6 +230,8 @@ export default function App() {
   const [publishAfterAuth, setPublishAfterAuth] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [passwordFlowEmail, setPasswordFlowEmail] = useState("");
+  // Publicación abierta en la vista de juego. null = TAKABLOX por defecto.
+  const [playing, setPlaying] = useState<Listing | null>(null);
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [creatorGateOpen, setCreatorGateOpen] = useState(false);
@@ -426,6 +434,12 @@ export default function App() {
     return listings.filter((item) => (filter === "todos" || item.category === filter)
       && (!normalized || `${item.title} ${item.description} ${item.publisher}`.toLocaleLowerCase("es").includes(normalized)));
   }, [filter, listings, query]);
+
+  const openGame = (item: Listing | null) => {
+    setPlaying(item);
+    setSelected(null);
+    navigate("takablox");
+  };
 
   const navigate = (nextView: View) => {
     setView(nextView);
@@ -760,7 +774,7 @@ export default function App() {
           <button className={view === "inicio" ? "active" : ""} type="button" onClick={() => navigate("inicio")}>Inicio</button>
           <button className={view === "catalogo" && filter === "juego" ? "active" : ""} type="button" onClick={() => chooseCategory("juego")}>Juegos</button>
           <button className={view === "catalogo" && filter === "software" ? "active" : ""} type="button" onClick={() => chooseCategory("software")}>Software</button>
-          <button className={view === "takablox" ? "active" : ""} type="button" onClick={() => navigate("takablox")}>Jugar TAKABLOX</button><button className={view === "servicios" ? "active" : ""} type="button" onClick={() => navigate("servicios")}>Soporte técnico</button>
+          <button className={view === "takablox" ? "active" : ""} type="button" onClick={() => openGame(null)}>Jugar TAKABLOX</button><button className={view === "servicios" ? "active" : ""} type="button" onClick={() => navigate("servicios")}>Soporte técnico</button>
           <button className={view === "como-funciona" ? "active" : ""} type="button" onClick={() => navigate("como-funciona")}>Cómo funciona</button>
           <button type="button" onClick={openPublish}>Vender en TAKANA</button>
           {isAdmin && <button className={view === "administracion" ? "active admin-nav" : "admin-nav"} type="button" onClick={() => navigate("administracion")}><UserCog /> Panel</button>}
@@ -820,7 +834,7 @@ export default function App() {
               <span className="eyebrow"><Gamepad2 /> Juego propio de TAKANA</span>
               <h2>TAKABLOX</h2>
               <p>Nuestro Tetris, hecho por el equipo. Se juega aquí mismo, en el navegador, sin descargar ni instalar nada.</p>
-              <button className="primary-button" type="button" onClick={() => navigate("takablox")}>
+              <button className="primary-button" type="button" onClick={() => openGame(null)}>
                 Jugar ahora <ArrowRight />
               </button>
             </div>
@@ -834,7 +848,7 @@ export default function App() {
           <div className="page-banner takablox-banner">
             <div>
               <span><Gamepad2 /> JUEGO ORIGINAL</span>
-              <h1>TAKABLOX</h1>
+              <h1>{playing?.title ?? "TAKABLOX"}</h1>
               <p>Usa las flechas para mover y rotar. La primera carga tarda un poco porque el juego se descarga completo.</p>
             </div>
             <button className="secondary-button" type="button" onClick={() => {
@@ -845,8 +859,8 @@ export default function App() {
           <div className="takablox-marco-caja">
             <iframe
               id="takablox-marco"
-              src="/takablox/index.html"
-              title="TAKABLOX"
+              src={playing?.playUrl ?? "/takablox/index.html"}
+              title={playing?.title ?? "TAKABLOX"}
               allow="autoplay; fullscreen; gamepad"
             />
           </div>
@@ -866,7 +880,7 @@ export default function App() {
           </div>
           {loading ? <div className="loading"><RefreshCw /> Cargando catálogo local...</div> : visibleListings.length ? (
             <div className="product-grid">
-              {visibleListings.map((item) => <ProductCard key={item.id} item={item} favorite={favorites.has(item.id)} onFavorite={() => toggleFavorite(item.id)} onOpen={() => setSelected(item)} onCart={() => addCart(item)} />)}
+              {visibleListings.map((item) => <ProductCard key={item.id} item={item} favorite={favorites.has(item.id)} onFavorite={() => toggleFavorite(item.id)} onOpen={() => setSelected(item)} onCart={() => addCart(item)} onPlay={() => openGame(item)} />)}
             </div>
           ) : <div className="empty-state"><Search /><h3>No encontramos resultados</h3><p>Prueba otra búsqueda o categoría.</p><button type="button" onClick={() => { setQuery(""); setFilter("todos"); }}>Limpiar filtros</button></div>}
         </section>}
@@ -949,7 +963,9 @@ export default function App() {
         </nav>
       </footer>
 
-      {selected && <Modal className="product-modal" onClose={() => setSelected(null)}><div className="modal-product-art"><img src={covers[selected.coverKey] || covers.orbit} alt="" /></div><div className="modal-product-copy"><span className={`product-badge badge-${categoryCopy[selected.category].tone}`}>{categoryCopy[selected.category].label}</span><h2>{selected.title}</h2><p>{selected.description}</p><div className="modal-rating"><Star /> 4.8 <small>128 reseñas verificadas</small></div><strong>{currency(selected.priceCents)}</strong><ul><li><Check /> Entrega o confirmación inmediata</li><li><Check /> Publicado por {selected.publisher}</li><li><Check /> Datos guardados localmente</li>{selected.hasExecutable && <li><Download /> {distributionKind(selected.downloadFilename)} · {fileSize(selected.downloadSize)}</li>}</ul><div className="modal-product-actions">{selected.hasExecutable && <button className="secondary-button" type="button" onClick={() => void downloadDistribution(selected)}><Download /> Descargar proyecto</button>}<button className="primary-button" type="button" onClick={() => { void addCart(selected); setSelected(null); }}><ShoppingCart /> Añadir al carrito</button></div></div></Modal>}
+      {selected && <Modal className="product-modal" onClose={() => setSelected(null)}><div className="modal-product-art"><img src={covers[selected.coverKey] || covers.orbit} alt="" /></div><div className="modal-product-copy"><span className={`product-badge badge-${categoryCopy[selected.category].tone}`}>{categoryCopy[selected.category].label}</span><h2>{selected.title}</h2><p>{selected.description}</p><div className="modal-rating"><Star /> 4.8 <small>128 reseñas verificadas</small></div><strong>{currency(selected.priceCents)}</strong><ul><li><Check /> Entrega o confirmación inmediata</li><li><Check /> Publicado por {selected.publisher}</li><li><Check /> Datos guardados localmente</li>{selected.hasExecutable && <li><Download /> {distributionKind(selected.downloadFilename)} · {fileSize(selected.downloadSize)}</li>}</ul><div className="modal-product-actions">{selected.hasExecutable && <button className="secondary-button" type="button" onClick={() => void downloadDistribution(selected)}><Download /> Descargar proyecto</button>}{selected.playUrl
+          ? <button className="primary-button" type="button" onClick={() => openGame(selected)}><Gamepad2 /> Jugar ahora</button>
+          : <button className="primary-button" type="button" onClick={() => { void addCart(selected); setSelected(null); }}><ShoppingCart /> Añadir al carrito</button>}</div></div></Modal>}
 
       {passwordFlowEmail && <Modal className="form-modal auth-modal" onClose={() => { setPasswordFlowEmail(""); setPasswordError(""); }}><span className="modal-kicker"><ShieldCheck /> VERIFICACIÓN POR CORREO</span><h2>Escribe el código que te enviamos</h2><p>Mandamos un código de verificación a <strong>{passwordFlowEmail}</strong>. Tu contraseña no cambia hasta que lo confirmes aquí.</p><form onSubmit={submitNewPassword}><label><span>Código del correo</span><div><ShieldCheck /><input name="code" inputMode="numeric" autoComplete="one-time-code" required placeholder="Ej. 483920" /></div></label><label><span>Nueva contraseña</span><div><LockKeyhole /><input name="password" type="password" autoComplete="new-password" minLength={6} required placeholder="Mínimo 6 caracteres" /></div></label><label><span>Repite la contraseña</span><div><LockKeyhole /><input name="repeat" type="password" autoComplete="new-password" minLength={6} required placeholder="Escríbela de nuevo" /></div></label>{passwordError && <div className="auth-error" role="alert"><X /> <span>{passwordError}</span></div>}<button className="primary-button" type="submit" disabled={passwordSubmitting}>{passwordSubmitting ? <><RefreshCw className="spin" /> Guardando...</> : <>Guardar contraseña <ArrowRight /></>}</button><button className="link-button" type="button" disabled={passwordSubmitting} onClick={() => void requestPasswordChange(passwordFlowEmail)}>No me llegó, enviar otro código</button></form></Modal>}
 

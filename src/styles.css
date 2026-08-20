@@ -173,3 +173,12 @@ footer{min-height:100px;display:grid;grid-template-columns:1fr auto 1fr;align-it
   /* En vertical el 16/9 deja el juego minusculo. */
   .takablox-marco-caja{aspect-ratio:3/4}
 }
+
+/* Botón de jugar en la tarjeta del catálogo, en lugar del carrito. */
+.play-chip{
+  height:32px;display:inline-flex;align-items:center;gap:6px;padding:0 12px;
+  border:0;border-radius:20px;cursor:pointer;
+  background:linear-gradient(90deg,#30baf0,#7b41f0);color:#fff;
+  font-size:9px;font-weight:800;letter-spacing:.04em;
+}
+.play-chip svg{width:14px}
