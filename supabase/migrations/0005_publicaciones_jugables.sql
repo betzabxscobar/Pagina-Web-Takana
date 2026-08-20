@@ -29,7 +29,7 @@ values (
   'takablox',
   true,
   true,
-  '/takablox/index.html'
+  '/takablox/takana.html'
 )
 on conflict (slug) do update set
   title       = excluded.title,

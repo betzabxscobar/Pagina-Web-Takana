@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes">
+<title>TAKABLOX</title>
+<!--
+  Envoltorio propio de TAKANA para la compilación WebGL.
+
+  No se usa el index.html que genera Unity porque su plantilla trae una barra
+  inferior con el logo de Unity, el nombre interno del proyecto y un botón de
+  pantalla completa que no pegan con el resto del sitio, y porque deja el lienzo
+  fijo en 960x600, lo que dibujaba un marco alrededor del juego.
+
+  Está en un archivo aparte, y no como parche sobre index.html, para que
+  reexportar el juego desde Unity no borre estos ajustes: al reexportar sólo se
+  reemplazan Build/, TemplateData/ e index.html.
+-->
+<style>
+  html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#0b0820; }
+  #lienzo { display:block; width:100%; height:100%; background:#0b0820; }
+
+  /* Carga: se reemplaza la barra de Unity por una con los colores del sitio. */
+  #carga {
+    position:absolute; inset:0; display:grid; place-content:center; gap:14px; justify-items:center;
+    color:#cfd3ef; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; text-align:center;
+  }
+  #carga p { margin:0; font-size:13px; letter-spacing:.02em; }
+  #carga small { color:#7d84ad; font-size:11.5px; }
+  #barra { width:220px; height:6px; border-radius:99px; background:#221c4d; overflow:hidden; }
+  #barra > i { display:block; width:0; height:100%; border-radius:99px; background:linear-gradient(90deg,#30baf0,#7b41f0,#e23ee4); transition:width .2s; }
+
+  #aviso {
+    position:absolute; left:50%; top:12px; transform:translateX(-50%);
+    max-width:80%; padding:9px 13px; border-radius:9px;
+    background:#2a1020; color:#ffb4c8; font-family:system-ui,sans-serif; font-size:12.5px;
+    display:none;
+  }
+</style>
+</head>
+<body>
+  <canvas id="lienzo" tabindex="-1"></canvas>
+
+  <div id="carga">
+    <p>Cargando TAKABLOX…</p>
+    <div id="barra"><i></i></div>
+    <small>La primera vez tarda: se descarga el juego completo.</small>
+  </div>
+
+  <div id="aviso"></div>
+
+<script>
+  var lienzo = document.querySelector("#lienzo");
+  var carga = document.querySelector("#carga");
+  var barra = document.querySelector("#barra > i");
+  var aviso = document.querySelector("#aviso");
+
+  function mostrarAviso(mensaje, tipo) {
+    if (tipo !== "error") return; // Los avisos pasajeros de Unity no aportan nada aquí.
+    aviso.style.display = "block";
+    aviso.textContent = mensaje;
+  }
+
+  var config = {
+    arguments: [],
+    dataUrl: "Build/Web.data.br",
+    frameworkUrl: "Build/Web.framework.js.br",
+    codeUrl: "Build/Web.wasm.br",
+    streamingAssetsUrl: "StreamingAssets",
+    companyName: "TAKANA",
+    productName: "TAKABLOX",
+    productVersion: "1.0",
+    showBanner: mostrarAviso,
+  };
+
+  var script = document.createElement("script");
+  script.src = "Build/Web.loader.js";
+  script.onload = function () {
+    createUnityInstance(lienzo, config, function (avance) {
+      barra.style.width = (avance * 100) + "%";
+    }).then(function (instancia) {
+      carga.style.display = "none";
+      // La página de TAKANA llama a esto desde su botón, para que el juego
+      // entre en pantalla completa igual que con el botón propio de Unity:
+      // así el lienzo se redimensiona en vez de quedar pequeño y rodeado
+      // de negro, que es lo que pasa al poner el iframe en pantalla completa.
+      window.takabloxPantallaCompleta = function () { instancia.SetFullscreen(1); };
+    }).catch(function (error) {
+      mostrarAviso("No se pudo cargar el juego: " + error, "error");
+    });
+  };
+  document.body.appendChild(script);
+</script>
+</body>
+</html>

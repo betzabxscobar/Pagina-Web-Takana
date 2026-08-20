@@ -106,6 +106,12 @@ Para actualizarlo, en Unity: **File → Build Settings → Platform: WebGL → B
 de la carpeta resultante (`index.html`, `Build/`, `TemplateData/`) reemplaza lo que hay en
 `public/takablox/`.
 
+La página que se muestra es [public/takablox/takana.html](public/takablox/takana.html), un
+envoltorio propio, y no el `index.html` que genera Unity: su plantilla trae una barra con el logo de
+Unity, el nombre interno del proyecto y un botón de pantalla completa que no pegan con el sitio, y
+deja el lienzo fijo en 960x600, lo que dibujaba un marco alrededor del juego. Al estar en un archivo
+aparte, reexportar desde Unity no borra esos ajustes.
+
 Unity exporta comprimido en Brotli, así que el cargador pide `Build/Web.data.br`, `Web.wasm.br` y
 `Web.framework.js.br` directamente. El navegador sólo los descomprime si la respuesta trae
 `Content-Encoding: br`; sin esa cabecera el juego no arranca. Ni el servidor de desarrollo de Vite

@@ -19,6 +19,7 @@ import {
   Instagram,
   Laptop,
   LockKeyhole,
+  Maximize2,
   LogOut,
   Mail,
   Menu,
@@ -840,13 +841,15 @@ export default function App() {
             </div>
             <button className="secondary-button" type="button" onClick={() => {
               const marco = document.getElementById("takablox-marco") as HTMLIFrameElement | null;
-              void marco?.requestFullscreen?.();
-            }}>Pantalla completa</button>
+              const ventana = marco?.contentWindow as (Window & { takabloxPantallaCompleta?: () => void }) | null;
+              if (ventana?.takabloxPantallaCompleta) ventana.takabloxPantallaCompleta();
+              else void marco?.requestFullscreen?.();
+            }}><Maximize2 /> Pantalla completa</button>
           </div>
           <div className="takablox-marco-caja">
             <iframe
               id="takablox-marco"
-              src={playing?.playUrl ?? "/takablox/index.html"}
+              src={playing?.playUrl ?? "/takablox/takana.html"}
               title={playing?.title ?? "TAKABLOX"}
               allow="autoplay; fullscreen; gamepad"
             />
