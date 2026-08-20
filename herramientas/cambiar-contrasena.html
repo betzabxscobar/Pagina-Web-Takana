@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TAKANA · Cambiar contraseña</title>
+<!--
+  Herramienta temporal.
+
+  Sirve para que cada persona cambie su contraseña de TAKANA sin instalar el
+  proyecto, mientras la aplicacion no este desplegada en un servidor.
+
+  Se abre con doble clic y habla directo con Supabase por HTTPS. Solo usa la
+  clave anon, que es publica por diseno y no da acceso a nada por si sola: para
+  cambiar la contrasena hay que demostrar que se conoce la actual.
+
+  ELIMINAR cuando la aplicacion este desplegada. A partir de entonces el cambio
+  se hace desde la propia pagina, en Cuenta -> Cambiar contrasena, con
+  verificacion por codigo al correo.
+-->
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #0f1230; color: #f3f4fb;
+  }
+  main { width: min(420px, 100%); }
+  .marca { font-size: 12px; font-weight: 800; letter-spacing: .16em; color: #8f7bf5; }
+  h1 { margin: 6px 0 4px; font-size: 26px; }
+  .sub { margin: 0 0 22px; font-size: 14px; line-height: 1.5; color: #a3a8c4; }
+  form { display: grid; gap: 14px; padding: 24px; border: 1px solid #2b3060; border-radius: 16px; background: #171b40; }
+  label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
+  input {
+    height: 44px; padding: 0 12px; border: 1px solid #343a70; border-radius: 9px;
+    background: #101339; color: inherit; font-size: 15px;
+  }
+  input:focus { outline: 2px solid #7b5cf0; outline-offset: 1px; }
+  button {
+    height: 46px; margin-top: 4px; border: 0; border-radius: 9px; cursor: pointer;
+    background: linear-gradient(90deg, #2fb6ef, #7b41f0); color: #fff; font-size: 15px; font-weight: 700;
+  }
+  button:disabled { opacity: .55; cursor: default; }
+  .aviso { margin-top: 16px; padding: 12px 14px; border-radius: 10px; font-size: 13.5px; line-height: 1.5; }
+  .error { border: 1px solid #7d2a45; background: #2a1020; color: #ffb4c8; }
+  .exito { border: 1px solid #2c6b45; background: #10251a; color: #a9ecc4; }
+  .pie { margin-top: 18px; font-size: 12.5px; line-height: 1.6; color: #767c9e; }
+</style>
+</head>
+<body>
+<main>
+  <div class="marca">TAKANA</div>
+  <h1>Cambiar contraseña</h1>
+  <p class="sub">Escribe tu contraseña actual y la nueva. No necesitas instalar nada ni pedirle acceso a nadie.</p>
+
+  <form id="formulario">
+    <label>Correo
+      <input name="email" type="email" autocomplete="username" required placeholder="tucorreo@gmail.com">
+    </label>
+    <label>Contraseña actual
+      <input name="actual" type="password" autocomplete="current-password" required placeholder="La que usas hoy">
+    </label>
+    <label>Contraseña nueva
+      <input name="nueva" type="password" autocomplete="new-password" minlength="6" required placeholder="Mínimo 6 caracteres">
+    </label>
+    <label>Repite la nueva
+      <input name="repetir" type="password" autocomplete="new-password" minlength="6" required placeholder="Escríbela otra vez">
+    </label>
+    <button type="submit" id="boton">Cambiar mi contraseña</button>
+  </form>
+
+  <div id="mensaje" hidden></div>
+
+  <p class="pie">
+    Tu contraseña actual sirve como verificación: sin ella nadie puede cambiarla por ti.
+    Cuando TAKANA esté publicada en internet, este archivo deja de usarse y el cambio se hace
+    desde la propia página.
+  </p>
+</main>
+
+<script>
+const SUPABASE_URL = "https://zfmbaemcczlpyzjyjeca.supabase.co";
+// Clave publica de Supabase: esta pensada para vivir en el navegador. Por si
+// sola no permite leer ni modificar nada, las politicas de la base deciden.
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpmbWJhZW1jY3pscHl6anlqZWNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDY3ODQsImV4cCI6MjEwMjcyMjc4NH0.2b9DjJ_cruqoJTpM2Fqj8eKx7ylRiG0rgiTI2BehS-w";
+
+const formulario = document.getElementById("formulario");
+const boton = document.getElementById("boton");
+const mensaje = document.getElementById("mensaje");
+
+function mostrar(texto, tipo) {
+  mensaje.hidden = false;
+  mensaje.className = "aviso " + tipo;
+  mensaje.textContent = texto;
+}
+
+formulario.addEventListener("submit", async (evento) => {
+  evento.preventDefault();
+  const datos = new FormData(formulario);
+  const email = String(datos.get("email") || "").trim().toLowerCase();
+  const actual = String(datos.get("actual") || "");
+  const nueva = String(datos.get("nueva") || "");
+
+  if (nueva !== String(datos.get("repetir") || "")) {
+    mostrar("Las dos contraseñas nuevas no coinciden.", "error");
+    return;
+  }
+  if (nueva === actual) {
+    mostrar("La contraseña nueva tiene que ser distinta de la actual.", "error");
+    return;
+  }
+
+  boton.disabled = true;
+  boton.textContent = "Cambiando...";
+  mensaje.hidden = true;
+
+  try {
+    // 1. Iniciar sesion prueba que la persona es dueña de la cuenta.
+    const acceso = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: actual }),
+    });
+    const sesion = await acceso.json();
+
+    if (!acceso.ok || !sesion.access_token) {
+      mostrar("Correo o contraseña actual incorrectos.", "error");
+      return;
+    }
+
+    // 2. Con esa sesion, cambiar la contrasena.
+    const cambio = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: "PUT",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${sesion.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ password: nueva }),
+    });
+    const resultado = await cambio.json();
+
+    if (!cambio.ok) {
+      mostrar(resultado.msg || resultado.error_description || "No se pudo cambiar la contraseña.", "error");
+      return;
+    }
+
+    formulario.reset();
+    mostrar("Listo. Tu contraseña quedó cambiada; usa la nueva para entrar a TAKANA.", "exito");
+  } catch {
+    mostrar("No se pudo conectar. Revisa tu conexión a internet e inténtalo otra vez.", "error");
+  } finally {
+    boton.disabled = false;
+    boton.textContent = "Cambiar mi contraseña";
+  }
+});
+</script>
+</body>
+</html>
