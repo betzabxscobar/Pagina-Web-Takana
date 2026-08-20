@@ -17,8 +17,19 @@
   reemplazan Build/, TemplateData/ e index.html.
 -->
 <style>
+  /* El juego se diseño para 960x600. Estirarlo a otra proporcion le recorta
+     los bordes: en 16:9 se perdian los botones de los extremos del menu.
+     Por eso el lienzo conserva 8/5 y se centra, ocupando lo maximo posible
+     sin deformarse. Vale igual dentro del marco que en pantalla completa. */
   html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#0b0820; }
-  #lienzo { display:block; width:100%; height:100%; background:#0b0820; }
+  body { display:grid; place-items:center; }
+  #lienzo {
+    display:block;
+    aspect-ratio:8/5;
+    width:min(100%, calc(100vh * 8 / 5));
+    max-height:100%;
+    background:#0b0820;
+  }
 
   /* Carga: se reemplaza la barra de Unity por una con los colores del sitio. */
   #carga {
