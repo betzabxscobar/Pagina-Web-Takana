@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import path from "node:path";
 import { distributionExtension, isSupportedDistributionFile } from "./distribution-formats.mjs";
+import { servirUnityWebGL } from "./unity-webgl.mjs";
 import { mailerConfigured, sendPasswordCode } from "./mailer.mjs";
 import { adminClient, clientForToken, guestClient, isolatedAuthClient, resolveUser } from "./supabase-client.mjs";
 import {
@@ -412,6 +413,9 @@ app.use("/api", (_request, response) => response.status(404).json({ error: "Ruta
 const distDirectory = path.join(process.cwd(), "dist");
 const serveApp = port === 3100 || process.env.TAKANA_SERVE_APP === "1" || Boolean(process.env.TAKANA_HOST);
 if (serveApp && existsSync(distDirectory)) {
+  // Debe ir ANTES de express.static: pone las cabeceras de compresión que
+  // necesita la compilación WebGL de TAKABLOX para poder arrancar.
+  app.use(servirUnityWebGL);
   app.use(express.static(distDirectory));
   app.get("/{*path}", (_request, response) => response.sendFile(path.join(distDirectory, "index.html")));
 }

@@ -45,7 +45,7 @@ import { PROJECT_IDENTITY } from "./projectIdentity";
 
 type Category = "juego" | "software" | "servicio";
 type Filter = "todos" | Category;
-type View = "inicio" | "catalogo" | "servicios" | "como-funciona" | "administracion";
+type View = "inicio" | "catalogo" | "takablox" | "servicios" | "como-funciona" | "administracion";
 // "invitado" es el visitante sin sesion: no existe fila en profiles.
 type UserRole = "superadmin" | "admin" | "usuario" | "invitado";
 type AdminTab = "resumen" | "usuarios" | "publicaciones" | "citas" | "pedidos";
@@ -760,7 +760,7 @@ export default function App() {
           <button className={view === "inicio" ? "active" : ""} type="button" onClick={() => navigate("inicio")}>Inicio</button>
           <button className={view === "catalogo" && filter === "juego" ? "active" : ""} type="button" onClick={() => chooseCategory("juego")}>Juegos</button>
           <button className={view === "catalogo" && filter === "software" ? "active" : ""} type="button" onClick={() => chooseCategory("software")}>Software</button>
-          <button className={view === "servicios" ? "active" : ""} type="button" onClick={() => navigate("servicios")}>Soporte técnico</button>
+          <button className={view === "takablox" ? "active" : ""} type="button" onClick={() => navigate("takablox")}>Jugar TAKABLOX</button><button className={view === "servicios" ? "active" : ""} type="button" onClick={() => navigate("servicios")}>Soporte técnico</button>
           <button className={view === "como-funciona" ? "active" : ""} type="button" onClick={() => navigate("como-funciona")}>Cómo funciona</button>
           <button type="button" onClick={openPublish}>Vender en TAKANA</button>
           {isAdmin && <button className={view === "administracion" ? "active admin-nav" : "admin-nav"} type="button" onClick={() => navigate("administracion")}><UserCog /> Panel</button>}
@@ -814,7 +814,43 @@ export default function App() {
               return <button className={`category-card category-${meta.tone}`} type="button" onClick={() => category === "servicio" ? navigate("servicios") : chooseCategory(category)} key={category}><span><Icon /></span><div><strong>{meta.plural}</strong><small>{description}</small></div><ArrowRight /></button>;
             })}
           </section>
+
+          <section className="takablox-card" aria-label="TAKABLOX">
+            <div className="takablox-copy">
+              <span className="eyebrow"><Gamepad2 /> Juego propio de TAKANA</span>
+              <h2>TAKABLOX</h2>
+              <p>Nuestro Tetris, hecho por el equipo. Se juega aquí mismo, en el navegador, sin descargar ni instalar nada.</p>
+              <button className="primary-button" type="button" onClick={() => navigate("takablox")}>
+                Jugar ahora <ArrowRight />
+              </button>
+            </div>
+            <div className="takablox-art" aria-hidden="true">
+              <span /><span /><span /><span />
+            </div>
+          </section>
         </>}
+
+        {view === "takablox" && <section className="takablox-page">
+          <div className="page-banner takablox-banner">
+            <div>
+              <span><Gamepad2 /> JUEGO ORIGINAL</span>
+              <h1>TAKABLOX</h1>
+              <p>Usa las flechas para mover y rotar. La primera carga tarda un poco porque el juego se descarga completo.</p>
+            </div>
+            <button className="secondary-button" type="button" onClick={() => {
+              const marco = document.getElementById("takablox-marco") as HTMLIFrameElement | null;
+              void marco?.requestFullscreen?.();
+            }}>Pantalla completa</button>
+          </div>
+          <div className="takablox-marco-caja">
+            <iframe
+              id="takablox-marco"
+              src="/takablox/index.html"
+              title="TAKABLOX"
+              allow="autoplay; fullscreen; gamepad"
+            />
+          </div>
+        </section>}
 
         {view === "catalogo" && <section className="page-banner catalog-banner">
           <div><span><Gamepad2 /> CATÁLOGO DIGITAL</span><h1>Explora, descubre y crea.</h1><p>Juegos, herramientas y servicios seleccionados para tu próximo proyecto.</p></div>

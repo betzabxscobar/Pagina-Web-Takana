@@ -97,6 +97,21 @@ npm start
 
 El servidor sirve la aplicación compilada y el API desde `http://127.0.0.1:3100`.
 
+## TAKABLOX
+
+El juego propio del equipo se juega dentro de la web, sin descargar nada. Vive en
+`public/takablox/` y se accede desde la card del inicio o desde «Jugar TAKABLOX» en el menú.
+
+Para actualizarlo, en Unity: **File → Build Settings → Platform: WebGL → Build**, y el contenido
+de la carpeta resultante (`index.html`, `Build/`, `TemplateData/`) reemplaza lo que hay en
+`public/takablox/`.
+
+Unity exporta comprimido en Brotli, así que el cargador pide `Build/Web.data.br`, `Web.wasm.br` y
+`Web.framework.js.br` directamente. El navegador sólo los descomprime si la respuesta trae
+`Content-Encoding: br`; sin esa cabecera el juego no arranca. Ni el servidor de desarrollo de Vite
+ni `express.static` la ponen por su cuenta, así que la añade [server/unity-webgl.mjs](server/unity-webgl.mjs),
+que usan los dos entornos.
+
 ## Despliegue
 
 Mientras cada persona ejecuta el proyecto en su computador, todas necesitan el `.env` y las
